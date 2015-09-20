@@ -253,7 +253,7 @@ public class extools {
         Key ExitedWithKey;
         do {
             FormDisplay();
-            ExitedWithKey = KeyInput("[ESC]Back  [E]dit      con job righton        [N]ext [P]rev      [Home]Exit");
+            ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
             if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
                 if (ExitedWithKey.getCharacter() == 'n' && !CurrentRecordResultSet.isLast()) {
                     CurrentRecordResultSet.next();
