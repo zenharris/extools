@@ -1,0 +1,54 @@
+                     WDBM/extools Database Utilities
+Lot  : @0<<  Unit : @1<<      Name : @2<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+------------------------------------------------------------------------------
+Unit Ent. : @3<<<  Purchased : @4<<<<<<<<  Address : @6<<<<<<<<<<<<<<<<<<<<<<<
+                   Entered   : @5<<<<<<<<            @7<<<<<<<<<<<<<<<<<<<<<<<
+                                                     @8<<<<<<<<<<<<<<<<<<<<<<<
+
+Leased :Adele [@9<<<] Agent [@10<<] Own/Occ [@11<<] RayWh [@12<<]             
+        Rayne [@13<<] CentP [@14<<] Mercure [@15<<] Robin [@16<<] Dowl [@17<<] 
+------------------------------------------------------------------------------
+                                                                              
+ 
+
+
+                                                                            
+                                                                              
+------------------------------------------------------------------------------
+                                                                              
+                                                                              
+                                                                              
+%FIELD_DEF%
+lot_number:num:
+unit_number:num:valid:
+name:str:
+unit_entitlement:num:
+date_purchase:date:
+date_entry:date:
+address1:str:cap:
+address2:str:cap:
+address3:str:cap:
+leased_adele:boolean:sel:true:false:
+leased_agent:boolean:sel:true:false:
+owner_occupied:boolean:sel:true:false:
+leased_raywhite:boolean:sel:true:false:
+leased_rayne:boolean:sel:true:false:
+leased_plaza:boolean:sel:true:false:
+leased_mercure:boolean:sel:true:false:
+leased_robinson:boolean:sel:true:false:
+leased_dowling:boolean:sel:true:false:
+%LIST_DEF%
+%4s | %4s | %-60.60s | %-20.20s | %4s
+lot_number
+unit_number
+name
+address1
+unit_entitlement
+%SERVER_DETAILS%
+driver:Pg:
+database:sewer:
+userid:postgres:
+server_address:10.8.0.1:
+server_port:5432:
+jdbc:postgresql://10.8.0.1:5432/sewer
+%END%
