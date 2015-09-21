@@ -146,7 +146,7 @@ public class wdbm {
         return 0;
     }
     
-    public static void FormDisplay() throws SQLException {
+    public static void FormDisplay(ResultSet LocalResultSet) throws SQLException {
         int iter=0;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
         scrn.clear();
@@ -154,7 +154,7 @@ public class wdbm {
             Matcher m = p.matcher(LineBuffer);
             while (m.find()) {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
-                String FieldValue = CurrentRecordResultSet.getString(FieldList.get(ExtractFieldNumberFrom(FieldTemplate)).split(":")[0]);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
+                String FieldValue = LocalResultSet.getString(FieldList.get(ExtractFieldNumberFrom(FieldTemplate)).split(":")[0]);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
                 if (FieldValue == null) FieldValue = "";
                 FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
                 FieldValue = PadToPrintingLength(FieldValue, FieldTemplate);
@@ -268,10 +268,10 @@ public class wdbm {
         return KeyReceived;
     }
     
-    static Key DisplayAndEditRecord() throws SQLException, InterruptedException {
-        Key ExitedWithKey;
-        do {
-            FormDisplay();
+//    public static Key DisplayAndEditRecord() throws SQLException, InterruptedException {
+//        Key ExitedWithKey;
+//        do {
+/*            FormDisplay();
             ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
             if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
                 if (ExitedWithKey.getCharacter() == 'n' && !CurrentRecordResultSet.isLast()) {
@@ -286,7 +286,27 @@ public class wdbm {
         } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
         return ExitedWithKey;
     }
-  
+*/    
+     public static Key DisplayAndEditRecord(ResultSet LocalResult) throws SQLException, InterruptedException {
+        Key ExitedWithKey;
+        do {
+            FormDisplay(LocalResult);
+            ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
+            if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
+                if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
+                    LocalResult.next();
+                } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
+                    LocalResult.previous();
+                } else if (ExitedWithKey.getCharacter() == 'e') {
+                    unpackCurrentRecord(LocalResult); //unpackCurrentRecord(StatementResultSet);
+                    FormEditor();
+                }
+            }
+        } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
+        return ExitedWithKey;
+    }  
+    
+ /* 
     static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
         int iter = 0;
         List<String> Substitute = new ArrayList();
@@ -328,16 +348,5 @@ public class wdbm {
             } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
         }
     }
-    
-    public static void listdriver(String SQLQuery) {
-        try (Statement stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                ResultSet RSet = stmt.executeQuery(SQLQuery)) {
-            CurrentRecordResultSet = RSet; //CurrentRecordResultSet = StatementResultSet;
-            if (CurrentRecordResultSet.first()) while (DisplayList().getKind() != Key.Kind.Home && DisplayAndEditRecord().getKind() != Key.Kind.Home) scrn.clear();
-        } catch (Exception e) {
-            System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
-            //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-            // System.exit(0);
-        }
-    }
+     */
 }     
