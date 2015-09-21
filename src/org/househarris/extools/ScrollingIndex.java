@@ -65,7 +65,7 @@ public class ScrollingIndex {
             LocalString = String.format(ScrollingListFormat, ValuesSubstitute(ScrollingListFields).toArray());
             scrn.putString(0, iter, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
             scrn.refresh();
-            if ((KeyReturn = KeyInput("[Enter]Select                      [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
+            if ((KeyReturn = KeyInput("[Enter]Select                         [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
                 if (iter+3 < Tsize.getRows()-1) {
