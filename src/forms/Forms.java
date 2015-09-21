@@ -5,16 +5,10 @@
  */
 package forms;
 
+import org.househarris.extools.wdbm;
 
 
 
-
-
-import org.househarris.extools.extools;
-/**
- 
- * @author harris
- */
 public class Forms {
 
     /**
@@ -22,19 +16,18 @@ public class Forms {
      */
     public static void main(String[] args) {
         
-      extools resieFile = new extools("resie.dict");
+      try {
+          wdbm resieFile = new wdbm("resie.dict");
+          resieFile.listdriver("SELECT * FROM resie order by lot_number;");
+          resieFile.scrn.stopScreen(); 
+          
+      } catch (Exception e) {
+          System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
+          //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            // System.exit(0);
+      }
        
-        resieFile.listdriver("SELECT * FROM resie order by lot_number;");
 
-        // 
-        // resieFile.FormEdit();
-       
-        //
-        // resieFile.scrn.refresh();
-        
-        resieFile.scrn.stopScreen();   
-        
-        
         
         // TODO code application logic here
     }
