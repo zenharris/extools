@@ -42,7 +42,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+// import java.sql.Statement;
 
 public class wdbm {
 
@@ -268,25 +268,6 @@ public class wdbm {
         return KeyReceived;
     }
     
-//    public static Key DisplayAndEditRecord() throws SQLException, InterruptedException {
-//        Key ExitedWithKey;
-//        do {
-/*            FormDisplay();
-            ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
-            if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
-                if (ExitedWithKey.getCharacter() == 'n' && !CurrentRecordResultSet.isLast()) {
-                    CurrentRecordResultSet.next();
-                } else if (ExitedWithKey.getCharacter() == 'p' && !CurrentRecordResultSet.isFirst()) {
-                    CurrentRecordResultSet.previous();
-                } else if (ExitedWithKey.getCharacter() == 'e') {
-                    unpackCurrentRecord(); //unpackCurrentRecord(StatementResultSet);
-                    FormEditor();
-                }
-            }
-        } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
-        return ExitedWithKey;
-    }
-*/    
      public static Key DisplayAndEditRecord(ResultSet LocalResult) throws SQLException, InterruptedException {
         Key ExitedWithKey;
         do {
@@ -305,48 +286,11 @@ public class wdbm {
         } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
         return ExitedWithKey;
     }  
-    
- /* 
-    static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-        int iter = 0;
-        List<String> Substitute = new ArrayList();
-        for(String FieldName : FieldNameList ){
-            Substitute.add(CurrentRecordResultSet.getString(FieldName));
-        }
-        return Substitute;
+     
+    public static void IndexAndEditLoop (ScrollingIndex ResieList, wdbm resieFile) throws SQLException,InterruptedException {
+        if (ResieList.Results.first()) while (ResieList.DisplayList().getKind() != Key.Kind.Home && resieFile.DisplayAndEditRecord(ResieList.Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
 
-    public static Key DisplayList() throws SQLException, InterruptedException {
-        int iter;
-        Key KeyReturn;
-        String LocalString;
-        TerminalSize Tsize = terminal.getTerminalSize();
-        for (iter = 0; iter+3 < Tsize.getRows() && CurrentRecordResultSet.absolute(iter+1); iter++) {
-            writer.drawString(0, iter, String.format(ScrollingListFormat, ValuesSubstitute(ScrollingListFields).toArray()));
-        }
-        CurrentRecordResultSet.first();
-        iter = 0;
-        while (true) {
-            Tsize = terminal.getTerminalSize();
-            scrn.refresh();
-            LocalString = String.format(ScrollingListFormat, ValuesSubstitute(ScrollingListFields).toArray());
-            scrn.putString(0, iter, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
-            scrn.refresh();
-            if ((KeyReturn = KeyInput("[Enter]Select                      [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
-                return KeyReturn;
-            } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !CurrentRecordResultSet.isLast()) {
-                if (iter+3 < Tsize.getRows()-1) {
-                scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
-                iter++;
-                CurrentRecordResultSet.next();
-                }
-            } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !CurrentRecordResultSet.isFirst()) {
-                scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
-                iter--;
-                CurrentRecordResultSet.previous();
-            } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
-        }
-    }
-     */
+    
 }     
