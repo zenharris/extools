@@ -287,8 +287,8 @@ public class wdbm {
         return ExitedWithKey;
     }  
      
-    public static void IndexAndEditLoop (ScrollingIndex ResieList, wdbm resieFile) throws SQLException,InterruptedException {
-        if (ResieList.Results.first()) while (ResieList.DisplayList().getKind() != Key.Kind.Home && resieFile.DisplayAndEditRecord(ResieList.Results).getKind() != Key.Kind.Home) scrn.clear();
+    public static void ScrollingIndexAndEditLoop (ScrollingIndex ResieList, wdbm resieFile) throws SQLException,InterruptedException {
+        if (ResieList.Results.first()) while (ResieList.DisplayList(resieFile).getKind() != Key.Kind.Home && resieFile.DisplayAndEditRecord(ResieList.Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
 
