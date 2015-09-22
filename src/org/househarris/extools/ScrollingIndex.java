@@ -14,17 +14,17 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 //import static org.househarris.extools.wdbm.CurrentRecordResultSet;
-import static org.househarris.extools.wdbm.ScrollingListFormat;
-import static org.househarris.extools.wdbm.ScrollingListFields;
+// import static org.househarris.extools.wdbm.ScrollingListFormat;
+//import static org.househarris.extools.wdbm.ScrollingListFields;
 //import static org.househarris.extools.wdbm.ValuesSubstitute;
-import static org.househarris.extools.wdbm.terminal;
-import static org.househarris.extools.wdbm.writer;
-import static org.househarris.extools.wdbm.scrn;
-import static org.househarris.extools.wdbm.KeyInput;
+//import static org.househarris.extools.wdbm.terminal;
+//import static org.househarris.extools.wdbm.writer;
+//import static org.househarris.extools.wdbm.scrn;
+///import static org.househarris.extools.wdbm.KeyInput;
 import static org.househarris.extools.wdbm.SQLconnection;
-import static org.househarris.extools.wdbm.FormDisplay;
-import static org.househarris.extools.wdbm.FormEditor;
-import static org.househarris.extools.wdbm.unpackCurrentRecord;
+//import static org.househarris.extools.wdbm.FormDisplay;
+//import static org.househarris.extools.wdbm.FormEditor;
+//import static org.househarris.extools.wdbm.unpackCurrentRecord;
 /**
  *
  * @author harris
@@ -48,35 +48,60 @@ public class ScrollingIndex {
         return Substitute;
     }
     
+    static void scrollListUp (int CurrentScreenLine,wdbm Wdbm) throws SQLException {
+       int iter; 
+       int StartRow = Results.getRow() - CurrentScreenLine+1;
+       TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
+       for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
+            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
+        }   
+        
+    }
     
-    public static Key DisplayList() throws SQLException, InterruptedException {
+    static void scrollListDown(wdbm Wdbm) throws SQLException {
+        int iter;
+        int StartRow = Results.getRow();
+        TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
+        for (iter = 0; iter + 3 < Tsize.getRows() && Results.absolute(StartRow+iter-1); iter++) {
+            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
+        }
+        Results.absolute(StartRow-1);
+    }
+ 
+    public static Key DisplayList(wdbm Wdbm) throws SQLException, InterruptedException {
         int iter;
         Key KeyReturn;
         String LocalString;
-        TerminalSize Tsize = terminal.getTerminalSize();
+        TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
         for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(iter+1); iter++) {
-            writer.drawString(0, iter, String.format(ScrollingListFormat, ValuesSubstitute(ScrollingListFields).toArray()));
+            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
         }
         Results.first();
         iter = 0;
         while (true) {
-            Tsize = terminal.getTerminalSize();
-            scrn.refresh();
-            LocalString = String.format(ScrollingListFormat, ValuesSubstitute(ScrollingListFields).toArray());
-            scrn.putString(0, iter, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
-            scrn.refresh();
-            if ((KeyReturn = KeyInput("[Enter]Select                         [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
+            Tsize = Wdbm.terminal.getTerminalSize();
+            Wdbm.scrn.refresh();
+            LocalString = String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray());
+            Wdbm.scrn.putString(0, iter, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
+            Wdbm.scrn.refresh();
+            if ((KeyReturn = Wdbm.KeyInput("[Enter]Select                         [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
-                if (iter+3 < Tsize.getRows()-1) {
-                scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                if (iter+4 < Tsize.getRows()) {
+                Wdbm.scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                 iter++;
                 Results.next();
+                } else {
+                   scrollListUp(iter,Wdbm); 
                 }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
-                scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                if (iter>0) {
+                Wdbm.scrn.putString(0, iter, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                 iter--;
                 Results.previous();
+                } else {
+                    scrollListDown(Wdbm);
+                }
             } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
         }
     }
