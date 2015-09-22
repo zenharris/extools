@@ -21,7 +21,7 @@ public class Forms {
       try {
           wdbm resieFile = new wdbm("resie.dict");
           ScrollingIndex ResieList = new ScrollingIndex("SELECT * FROM resie order by lot_number;");
-          resieFile.IndexAndEditLoop(ResieList,resieFile);
+          resieFile.ScrollingIndexAndEditLoop(ResieList,resieFile);
           
           resieFile.scrn.stopScreen(); 
           
