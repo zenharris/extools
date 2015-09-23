@@ -33,6 +33,7 @@ public class ScrollingIndex {
     public static ResultSet Results;
     static int ScreenCurrentRow;
     static int ResultsCurrentRow;
+    static String ScrollPrompt = "[Enter]Select                               [ARROWS]ScrollUP/DN             [Home]Exit";
 
     public ScrollingIndex(String SQLQuery) throws SQLException {
         Statement stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
@@ -41,14 +42,12 @@ public class ScrollingIndex {
         ResultsCurrentRow = Results.getRow();
     }
 
-     
+    
     
     static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
         int iter = 0;
         List<String> Substitute = new ArrayList();
-        for(String FieldName : FieldNameList ){
-            Substitute.add(Results.getString(FieldName));
-        }
+        for(String FieldName : FieldNameList ) Substitute.add(Results.getString(FieldName));
         return Substitute;
     }
     
@@ -59,7 +58,6 @@ public class ScrollingIndex {
        for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
             Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
         }   
-        
     }
     
     static void scrollListDown(wdbm Wdbm) throws SQLException {
@@ -83,7 +81,6 @@ public class ScrollingIndex {
             Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
         }
         Results.absolute(ResultsCurrentRow);
-        
         while (true) {
             Tsize = Wdbm.terminal.getTerminalSize();
             Wdbm.scrn.refresh();
@@ -91,22 +88,18 @@ public class ScrollingIndex {
             ResultsCurrentRow = Results.getRow();
             Wdbm.scrn.putString(0, ScreenCurrentRow, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
             Wdbm.scrn.refresh();
-            if ((KeyReturn = Wdbm.KeyInput("[Enter]Select                               [ARROWS]ScrollUP/DN             [Home]Exit")).getKind() == Key.Kind.Home) {
+            if ((KeyReturn = Wdbm.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
-                if (ScreenCurrentRow+4 < Tsize.getRows()) {
-                Wdbm.scrn.putString(0, ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
-                Results.next();
-                } else {
-                   scrollListUp(ScreenCurrentRow,Wdbm); 
-                }
+                if (ScreenCurrentRow + 4 < Tsize.getRows()) {
+                    Wdbm.scrn.putString(0, ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    Results.next();
+                } else scrollListUp(ScreenCurrentRow, Wdbm);
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
-                if (ScreenCurrentRow>0) {
-                Wdbm.scrn.putString(0, ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
-                Results.previous();
-                } else {
-                    scrollListDown(Wdbm);
-                }
+                if (ScreenCurrentRow > 0) {
+                    Wdbm.scrn.putString(0, ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    Results.previous();
+                } else scrollListDown(Wdbm);
             } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
         }
     }
