@@ -175,7 +175,7 @@ public class wdbm {
                 return(FieldValue);
     }
     
-    public static void FormEditor() throws InterruptedException {
+    public static void FormEditor() throws SQLException, InterruptedException {
         int iter = 0;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
         for (String LineBuffer : FormTemplate) {
@@ -204,7 +204,7 @@ public class wdbm {
         writer.drawString(x + LineEditorBuffer.length(), y, " ");
     }
     
-    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws InterruptedException {
+    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
         else LineEditorBuffer = "";
@@ -245,6 +245,15 @@ public class wdbm {
             CurrentRecord.add(FieldValue);
         }
     }
+
+    
+    static void DisplayPrompt(String Prompt) {
+        TerminalSize Tsize = terminal.getTerminalSize();
+        writer.drawString(0, Tsize.getRows() - 3, BLANK);
+        writer.drawString(0, Tsize.getRows() - 3, Prompt);
+        writer.drawString(0, Tsize.getRows() - 2, "?: ");
+        scrn.setCursorPosition(2, Tsize.getRows() - 2);
+    }
    
     /**
      *
@@ -252,18 +261,22 @@ public class wdbm {
      * @return
      * @throws InterruptedException
      */
-    public static Key KeyInput(String... Prompt) throws InterruptedException {
+    public static Key KeyInput(String... Prompt) throws SQLException, InterruptedException {
         Key KeyReceived;
         if (Prompt.length > 0) {
-            TerminalSize Tsize = terminal.getTerminalSize();
-            writer.drawString(0, Tsize.getRows()-3, BLANK);
-            writer.drawString(0, Tsize.getRows()-3, Prompt[0]);
-            writer.drawString(0, Tsize.getRows()-2, "?: ");
-            scrn.setCursorPosition(2, Tsize.getRows()-2);
+            DisplayPrompt(Prompt[0]);
             scrn.refresh();
         }
         while ((KeyReceived = scrn.readInput()) == null) {
-                Thread.sleep(3);
+            Thread.sleep(3);
+            if (scrn.resizePending()) {
+                if (Prompt.length > 0) {
+                    scrn.clear();
+                    ScrollingIndex.ReDrawList();
+                    DisplayPrompt(Prompt[0]);
+                }
+                scrn.refresh();
+            }
         }
         return KeyReceived;
     }
