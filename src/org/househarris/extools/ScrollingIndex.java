@@ -34,6 +34,7 @@ public class ScrollingIndex {
     static int ScreenCurrentRow;
     static int ResultsCurrentRow;
     static String ScrollPrompt = "[Enter]Select                               [ARROWS]ScrollUP/DN             [Home]Exit";
+    static wdbm AttachedWDBM;
 
     public ScrollingIndex(String SQLQuery) throws SQLException {
         Statement stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
@@ -41,8 +42,6 @@ public class ScrollingIndex {
         ScreenCurrentRow = 0;
         ResultsCurrentRow = Results.getRow();
     }
-
-    
     
     static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
         int iter = 0;
@@ -52,35 +51,41 @@ public class ScrollingIndex {
     }
     
     static void scrollListUp (int CurrentScreenLine,wdbm Wdbm) throws SQLException {
-       int iter; 
-       int StartRow = Results.getRow() - CurrentScreenLine+1;
-       TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-       for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
-            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-        }   
+       //int iter; 
+       //int StartRow = Results.getRow() - CurrentScreenLine+1;
+       //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
+       //for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
+       //     Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
+       // }   
     }
     
     static void scrollListDown(wdbm Wdbm) throws SQLException {
-        int iter;
-        int StartRow = Results.getRow();
-        TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-        for (iter = 0; iter + 3 < Tsize.getRows() && Results.absolute(StartRow+iter-1); iter++) {
-            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-        }
-        Results.absolute(StartRow-1);
+        //int iter;
+        //int StartRow = Results.getRow();
+        //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
+        //for (iter = 0; iter + 3 < Tsize.getRows() && Results.absolute(StartRow+iter-1); iter++) {
+        //    Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
+        //}
+        //Results.absolute(StartRow-1);
     }
- 
-    public static Key DisplayList(wdbm Wdbm) throws SQLException, InterruptedException {
+    
+    public static void ReDrawList() throws SQLException {
+        TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
+        int SaveResultRow = Results.getRow();
+        int startrow = Results.getRow() - ScreenCurrentRow;
         int iter;
+        for (iter = 0; iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
+            AttachedWDBM.writer.drawString(0, iter, String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
+        }
+        Results.absolute(SaveResultRow);
+    }
+
+    public static Key DisplayList(wdbm Wdbm) throws SQLException, InterruptedException {
         Key KeyReturn;
         String LocalString;
         TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-        int startrow = Results.getRow()-ScreenCurrentRow;
-        ResultsCurrentRow = Results.getRow();
-        for (iter = 0; iter+4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-        }
-        Results.absolute(ResultsCurrentRow);
+        AttachedWDBM = Wdbm;
+        ReDrawList();
         while (true) {
             Tsize = Wdbm.terminal.getTerminalSize();
             Wdbm.scrn.refresh();
@@ -94,12 +99,20 @@ public class ScrollingIndex {
                 if (ScreenCurrentRow + 4 < Tsize.getRows()) {
                     Wdbm.scrn.putString(0, ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                     Results.next();
-                } else scrollListUp(ScreenCurrentRow, Wdbm);
+                } else {
+                    Results.next();
+                    ReDrawList();
+                    // scrollListUp(ScreenCurrentRow, Wdbm);
+                }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
                 if (ScreenCurrentRow > 0) {
                     Wdbm.scrn.putString(0, ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                     Results.previous();
-                } else scrollListDown(Wdbm);
+                } else {
+                    Results.previous();
+                    ReDrawList();
+                    // scrollListDown(Wdbm);
+                }
             } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
         }
     }
