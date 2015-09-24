@@ -6,6 +6,7 @@
 package org.househarris.extools;
 
 import com.googlecode.lanterna.input.Key;
+import java.sql.SQLException;
 
 /**
  *
@@ -34,7 +35,7 @@ public class texaco {
         wdbmAttached.writer.drawString(x + LineEditorBuffer.length(), y, " ");
     }
     
-    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws InterruptedException {
+    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
         else LineEditorBuffer = "";
