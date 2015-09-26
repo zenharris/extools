@@ -16,15 +16,13 @@ public class Forms {
     /**
      * @param args the command line arguments
      */
+    
     public static void main(String[] args) {
       try {
           wdbm resieFile = new wdbm("resie.dict");
-          resieFile.CreateIndexScroll("SELECT * FROM resie order by lot_number;");
-          // indexscroll ResieList = new indexscroll("SELECT * FROM resie order by lot_number;");
-          resieFile.ScrollingIndexAndEditLoop(resieFile);
-          
+          resieFile.CreateIndexScroll("SELECT * FROM resie order by lot_number;",resieFile);
+          resieFile.ScrollingIndexAndEditLoop();
           resieFile.scrn.stopScreen(); 
-          
       } catch (Exception e) {
           System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
           //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
