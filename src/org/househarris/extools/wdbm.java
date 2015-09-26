@@ -270,11 +270,17 @@ public class wdbm {
             scrn.refresh();
         }
         while ((KeyReceived = scrn.readInput()) == null) {
-            Thread.sleep(3);
+            Thread.sleep(1);
             if (scrn.resizePending()) {
                 if (Prompt.length > 0) {
                     scrn.clear();
-                    indexscroll.ReDrawList();
+                    int LastIndexScroll = IndexScrolls.size() - 1;
+                    TerminalSize Tsize = terminal.getTerminalSize();
+                    if (Tsize.getRows()+4 > IndexScrolls.get(LastIndexScroll).ScreenCurrentRow)
+                        IndexScrolls.get(LastIndexScroll).ScreenCurrentRow = Tsize.getRows()-4;
+                    
+                    IndexScrolls.get(LastIndexScroll).ReDrawList();
+                    IndexScrolls.get(LastIndexScroll).IlluminateCurrentRow();
                     DisplayPrompt(Prompt[0]);
                 }
                 scrn.refresh();
@@ -302,15 +308,15 @@ public class wdbm {
         return ExitedWithKey;
     }  
      
-    public static void ScrollingIndexAndEditLoop (wdbm resieFile) throws SQLException,InterruptedException {
+    public static void ScrollingIndexAndEditLoop () throws SQLException,InterruptedException {
         int LastIndexScroll = IndexScrolls.size() - 1;
         if (IndexScrolls.get(LastIndexScroll).Results.first()) 
-            while (IndexScrolls.get(LastIndexScroll).DisplayList(resieFile).getKind() != Key.Kind.Home
-                    && resieFile.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
+            while (IndexScrolls.get(LastIndexScroll).DisplayList().getKind() != Key.Kind.Home
+                    && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
-    public static void CreateIndexScroll(String SQLQuery) throws SQLException {
-        indexscroll Temp = new indexscroll(SQLQuery);
+    public static void CreateIndexScroll(String SQLQuery,wdbm AttachWDBM) throws SQLException {
+        indexscroll Temp = new indexscroll(SQLQuery,AttachWDBM);
         IndexScrolls.add(Temp);
     }
   
