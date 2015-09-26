@@ -73,6 +73,8 @@ public class wdbm {
     
     public static final String REGEXToMatchEmbededFieldTemplate = "@\\d+<+"; 
     public static final String REGEXToMatchNumberEmbededInFieldTemplate = "\\d+";
+    
+    public static List<indexscroll> IndexScrolls = new ArrayList();
 
     public wdbm(String DataDictionaryFilename) {
         terminal = TerminalFacade.createTerminal();
@@ -272,7 +274,7 @@ public class wdbm {
             if (scrn.resizePending()) {
                 if (Prompt.length > 0) {
                     scrn.clear();
-                    ScrollingIndex.ReDrawList();
+                    indexscroll.ReDrawList();
                     DisplayPrompt(Prompt[0]);
                 }
                 scrn.refresh();
@@ -300,10 +302,17 @@ public class wdbm {
         return ExitedWithKey;
     }  
      
-    public static void ScrollingIndexAndEditLoop (ScrollingIndex ResieList, wdbm resieFile) throws SQLException,InterruptedException {
-        if (ResieList.Results.first()) while (ResieList.DisplayList(resieFile).getKind() != Key.Kind.Home && resieFile.DisplayAndEditRecord(ResieList.Results).getKind() != Key.Kind.Home) scrn.clear();
+    public static void ScrollingIndexAndEditLoop (wdbm resieFile) throws SQLException,InterruptedException {
+        int LastIndexScroll = IndexScrolls.size() - 1;
+        if (IndexScrolls.get(LastIndexScroll).Results.first()) 
+            while (IndexScrolls.get(LastIndexScroll).DisplayList(resieFile).getKind() != Key.Kind.Home
+                    && resieFile.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
-
+    public static void CreateIndexScroll(String SQLQuery) throws SQLException {
+        indexscroll Temp = new indexscroll(SQLQuery);
+        IndexScrolls.add(Temp);
+    }
+  
     
 }     
