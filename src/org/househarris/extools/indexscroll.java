@@ -59,11 +59,12 @@ public class indexscroll{
     static wdbm AttachedWDBM;
 
 
-    public indexscroll(String SQLQuery) throws SQLException {
+    public indexscroll(String SQLQuery,wdbm WDBMAttach) throws SQLException {
         Statement stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         Results = stmt.executeQuery(SQLQuery);
         ScreenCurrentRow = 0;
         ResultsCurrentRow = Results.getRow();
+        AttachedWDBM = WDBMAttach;
     }
     
     static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
@@ -106,25 +107,29 @@ public class indexscroll{
         Results.absolute(SaveResultRow);
     }
 
-    public static Key DisplayList(wdbm Wdbm) throws SQLException, InterruptedException {
+    public static void IlluminateCurrentRow() throws SQLException {
+        String LocalString = String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
+        AttachedWDBM.scrn.putString(0, ScreenCurrentRow, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
+        
+    }
+    
+    public static Key DisplayList() throws SQLException, InterruptedException {
         Key KeyReturn;
         String LocalString;
-        TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-       
-        AttachedWDBM = Wdbm;
+        TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         ReDrawList();
         while (true) {
-            Tsize = Wdbm.terminal.getTerminalSize();
-            Wdbm.scrn.refresh();
-            LocalString = String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray());
+            Tsize = AttachedWDBM.terminal.getTerminalSize();
+            // AttachedWDBM.scrn.refresh();
+            LocalString = String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
             ResultsCurrentRow = Results.getRow();
-            Wdbm.scrn.putString(0, ScreenCurrentRow, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
-            Wdbm.scrn.refresh();
-            if ((KeyReturn = Wdbm.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
+            IlluminateCurrentRow();
+            AttachedWDBM.scrn.refresh();
+            if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
                 if (ScreenCurrentRow + 4 < Tsize.getRows()) {
-                    Wdbm.scrn.putString(0, ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    AttachedWDBM.scrn.putString(0, ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                     Results.next();
                 } else {
                     Results.next();
@@ -133,7 +138,7 @@ public class indexscroll{
                 }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
                 if (ScreenCurrentRow > 0) {
-                    Wdbm.scrn.putString(0, ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    AttachedWDBM.scrn.putString(0, ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                     Results.previous();
                 } else {
                     Results.previous();
