@@ -1,12 +1,11 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ *    EXAMPLE MAIN LINE FIREING UP AND USING WDBM/extools TO OPEN AND EDIT
+ *    an sql database under postgreSQL in the table "resie".
  */
 package forms;
 
 import com.googlecode.lanterna.input.Key;
-import org.househarris.extools.ScrollingIndex;
+import org.househarris.extools.indexscroll;
 import org.househarris.extools.wdbm;
 import static org.househarris.extools.wdbm.scrn;
 
@@ -20,8 +19,9 @@ public class Forms {
     public static void main(String[] args) {
       try {
           wdbm resieFile = new wdbm("resie.dict");
-          ScrollingIndex ResieList = new ScrollingIndex("SELECT * FROM resie order by lot_number;");
-          resieFile.ScrollingIndexAndEditLoop(ResieList,resieFile);
+          resieFile.CreateIndexScroll("SELECT * FROM resie order by lot_number;");
+          // indexscroll ResieList = new indexscroll("SELECT * FROM resie order by lot_number;");
+          resieFile.ScrollingIndexAndEditLoop(resieFile);
           
           resieFile.scrn.stopScreen(); 
           
