@@ -42,16 +42,17 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+
 // import java.sql.Statement;
 
-public class wdbm {
+public class wdbm implements extools {
 
-    public static String LineEditorBuffer = "";
-    public static int LineEditorPosition = 0;
-    public static Key LineEditorReturnKey = null;
+    // public static String LineEditorBuffer = "";
+    //public static int LineEditorPosition = 0;
+    //public static Key LineEditorReturnKey = null;
     public static Terminal terminal;
     public static Screen scrn;
-    public static ScreenWriter writer;
+    public static ScreenWriter writer = null;
     public static List<String> FormTemplate = new ArrayList();
     public static List<String> FieldList = new ArrayList();
    // public static List<String> ListList = new ArrayList();
@@ -62,7 +63,7 @@ public class wdbm {
     public static Connection SQLconnection;
     public static ResultSet CurrentRecordResultSet;
     
-    static final String BLANK = "                                                                                                                             ";
+//    static final String BLANK = "                                                                                                                             ";
 
 
     // The following regular expressions find the field templates embeded in the FormTemplate list
@@ -71,12 +72,14 @@ public class wdbm {
     // These having been loaded in from the WDBM common data dictionary file 
     // set up for the SQL database being edited.
     
-    public static final String REGEXToMatchEmbededFieldTemplate = "@\\d+<+"; 
-    public static final String REGEXToMatchNumberEmbededInFieldTemplate = "\\d+";
+//    public static final String REGEXToMatchEmbededFieldTemplate = "@\\d+<+"; 
+//    public static final String REGEXToMatchNumberEmbededInFieldTemplate = "\\d+";
     
-    public static List<indexscroll> IndexScrolls = new ArrayList();
+   public static List<indexscroll> IndexScrolls = new ArrayList();
+    
+  //  public static texaco Texaco;
 
-    public wdbm(String DataDictionaryFilename) {
+    public wdbm(String DataDictionaryFilename) throws ClassNotFoundException,SQLException,IOException {
         terminal = TerminalFacade.createTerminal();
         scrn = TerminalFacade.createScreen(terminal);
         scrn.startScreen();
@@ -85,26 +88,17 @@ public class wdbm {
         writer = new ScreenWriter(scrn);
         writer.setForegroundColor(Terminal.Color.WHITE);
         writer.setBackgroundColor(Terminal.Color.BLACK);
- 
-        try {
-            ReadDataDictionary(Paths.get(DataDictionaryFilename));
-            OpenSQLfile();
-        } catch (IOException ErrorMessage) {
-            System.err.println(ErrorMessage);
-            System.exit(0);
-        }
+        //Texaco = new texaco();
+  
+        ReadDataDictionary(Paths.get(DataDictionaryFilename));
+        OpenSQLfile();
     }
 
-    public static void OpenSQLfile() {
-        try {
+    public static void OpenSQLfile() throws ClassNotFoundException,SQLException {
             Class.forName("org.postgresql.Driver");
             SQLconnection = DriverManager.getConnection(ServerDetails.get(ServerDetails.size()-1),"postgres",""); // "jdbc:postgresql://10.8.0.1:5432/sewer","postgres", "");
-            SQLconnection.setAutoCommit(false);
+            // SQLconnection.setAutoCommit(false);
             System.out.println("Opened database successfully");
-        } catch (Exception e) {
-            System.err.println(e.getClass().getName() + ": " + e.getMessage());
-            System.exit(0);
-        }
     }
     
  
@@ -186,14 +180,14 @@ public class wdbm {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
                 String FieldValue = CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
                 FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
-                LineEditorPosition = 0;
-                LineEditor(m.start(), iter, FieldTemplate.length(), FieldValue);
-                if (LineEditorReturnKey.getKind() == Key.Kind.Escape) return;
+                texaco.LineEditorPosition = 0;
+                texaco.LineEditor(m.start(), iter, FieldTemplate.length(), FieldValue);
+                if (texaco.LineEditorReturnKey.getKind() == Key.Kind.Escape) return;
             }
             iter++;
         }
     }
-
+/*
     static void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + CharacterToInsert + LineEditorBuffer.substring(LineEditorPosition); 
     }
@@ -235,7 +229,7 @@ public class wdbm {
             }
         }
     }
- 
+ */
     
     public static void unpackCurrentRecord(ResultSet... SetThisAsCurrent) throws SQLException {
         String FieldValue;
@@ -248,6 +242,13 @@ public class wdbm {
         }
     }
 
+    static void DisplayError(String ErrorText) {
+        TerminalSize Tsize = terminal.getTerminalSize();
+        writer.drawString(0, Tsize.getRows() - 1, BLANK);
+        writer.drawString(0, Tsize.getRows() - 1, ErrorText);
+        scrn.refresh();
+    //    KeyInput();
+    }
     
     static void DisplayPrompt(String Prompt) {
         TerminalSize Tsize = terminal.getTerminalSize();
@@ -256,7 +257,16 @@ public class wdbm {
         writer.drawString(0, Tsize.getRows() - 2, "?: ");
         scrn.setCursorPosition(2, Tsize.getRows() - 2);
     }
-   
+    
+    static String PromptForString(String Prompt) throws SQLException,InterruptedException{
+        TerminalSize Tsize = terminal.getTerminalSize();
+        String LocalString;
+        writer.drawString(0, Tsize.getRows() - 2, BLANK);
+        writer.drawString(0, Tsize.getRows() - 2, Prompt);
+        LocalString = texaco.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
+        writer.drawString(0, Tsize.getRows() - 2, BLANK);
+        return LocalString;
+    }
     /**
      *
      * @param Prompt
