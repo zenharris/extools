@@ -25,6 +25,7 @@
 package org.househarris.extools;
 
 import com.googlecode.lanterna.input.Key;
+import java.io.IOException;
 import java.sql.SQLException;
 
 /**
@@ -35,13 +36,13 @@ public class texaco {
     static String LineEditorBuffer = "";
     static int LineEditorPosition = 0;
     static Key LineEditorReturnKey;
-    static wdbm wdbmAttached;
     
-    
-    public texaco (wdbm AttachedTo) {
-        wdbmAttached = AttachedTo;
+   public texaco(String DataDictionaryFilename) throws IOException,ClassNotFoundException,SQLException {
+//        wdbm X = null;
+//        super(DataDictionaryFilename);
+//        return X;
     }
-    
+   
     static void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + CharacterToInsert + LineEditorBuffer.substring(LineEditorPosition); 
     }
@@ -51,19 +52,19 @@ public class texaco {
     }
     
     static void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
-        wdbmAttached.writer.drawString(x + LineEditorBuffer.length(), y, " ");
+        wdbm.writer.drawString(x + LineEditorBuffer.length(), y, " ");
     }
     
     public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
-        else LineEditorBuffer = "";
+//        else LineEditorBuffer = "";
         if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
         while (true) {
-            wdbmAttached.writer.drawString(x, y, LineEditorBuffer);
-            wdbmAttached.scrn.setCursorPosition(x + LineEditorPosition, y);
-            wdbmAttached.scrn.refresh();
-            LineEditorReturnKey = KeyReceived = wdbmAttached.KeyInput();
+            wdbm.writer.drawString(x, y, LineEditorBuffer);
+            wdbm.scrn.setCursorPosition(x + LineEditorPosition, y);
+            wdbm.scrn.refresh();
+            LineEditorReturnKey = KeyReceived = wdbm.KeyInput();
             if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
                 InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
                 LineEditorPosition++;
@@ -83,5 +84,7 @@ public class texaco {
             }
         }
     }
-    
+
+ 
 }
+    
