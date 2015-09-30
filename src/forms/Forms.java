@@ -20,15 +20,15 @@ public class Forms {
     public static void main(String[] args) {
       try {
           wdbm resieFile = new wdbm("resie.dict");
-          resieFile.CreateIndexScroll("SELECT * FROM resie order by lot_number;",resieFile);
+          resieFile.CreateIndexScroll("SELECT * FROM resie order by unit_entitlement;",resieFile);
           resieFile.ScrollingIndexAndEditLoop();
-          resieFile.scrn.stopScreen(); 
+          
       } catch (Exception e) {
           System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
           //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
             // System.exit(0);
+      } finally {
+         wdbm.scrn.stopScreen();  
       }
     }
-    
-    
 }
