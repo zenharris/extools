@@ -29,6 +29,7 @@ package org.househarris.extools;
 import com.googlecode.lanterna.input.Key;
 import com.googlecode.lanterna.terminal.Terminal;
 import com.googlecode.lanterna.terminal.TerminalSize;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -44,30 +45,40 @@ import static org.househarris.extools.wdbm.IndexScrolls;
 //import static org.househarris.extools.wdbm.scrn;
 ///import static org.househarris.extools.wdbm.KeyInput;
 import static org.househarris.extools.wdbm.SQLconnection;
+import static org.househarris.extools.texaco.*;
+
 //import static org.househarris.extools.wdbm.FormDisplay;
 //import static org.househarris.extools.wdbm.FormEditor;
 //import static org.househarris.extools.wdbm.unpackCurrentRecord;
+
+
 /**
  *
  * @author harris
  */
-public class indexscroll{
+public class indexscroll {
     public static ResultSet Results;
     static int ScreenCurrentRow;
     static int ResultsCurrentRow;
-    static String ScrollPrompt = "[Enter]Select                               [ARROWS]ScrollUP/DN             [Home]Exit";
+    static String ScrollPrompt = "[Enter]Select          [S]QL Query                     [ARROWS]ScrollUP/DN             [Home]Exit";
     static wdbm AttachedWDBM;
+    static Statement stmt;
+    static String CurrentSQLQuery;
+    static PreparedStatement CurrentCompiledSQLStatement;
 
 
     public indexscroll(String SQLQuery,wdbm WDBMAttach) throws SQLException {
-        Statement stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         Results = stmt.executeQuery(SQLQuery);
         ScreenCurrentRow = 0;
         ResultsCurrentRow = Results.getRow();
         AttachedWDBM = WDBMAttach;
+        CurrentSQLQuery = SQLQuery;
+        
+        
     }
     
-    static List<String> ValuesSubstitute(List<String> FieldNameList) throws SQLException {
+    static List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
         List<String> Substitute = new ArrayList();
         for(String FieldName : FieldNameList ) Substitute.add(Results.getString(FieldName));
         return Substitute;
@@ -79,7 +90,7 @@ public class indexscroll{
        //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
        //for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
        //     Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-       // }   
+       // }
     }
     
     static void scrollListDown(wdbm Wdbm) throws SQLException {
@@ -102,26 +113,39 @@ public class indexscroll{
         }
         int iter;
         for (iter = 0; iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            AttachedWDBM.writer.drawString(0, iter, String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
+            AttachedWDBM.writer.drawString(0, iter, String.format(AttachedWDBM.ScrollingListFormat,
+                    FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
         }
         Results.absolute(SaveResultRow);
     }
 
     public static void IlluminateCurrentRow() throws SQLException {
-        String LocalString = String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
-        AttachedWDBM.scrn.putString(0, ScreenCurrentRow, LocalString, Terminal.Color.BLACK, Terminal.Color.WHITE);
-        
+        AttachedWDBM.scrn.putString(0, ScreenCurrentRow,
+                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
+                Terminal.Color.BLACK, Terminal.Color.WHITE);
     }
     
-    public static Key DisplayList() throws SQLException, InterruptedException {
+    
+    public static void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
+        ResultSet LocalResults;
+            LocalResults = stmt.executeQuery(SQLQuery);
+            if (LocalResults.first()) {
+                Results = LocalResults;
+                ScreenCurrentRow = 0;
+                ResultsCurrentRow = Results.getRow();
+                ReDrawList();
+            }
+    }
+    
+    public static Key DisplayList() throws SQLException,InterruptedException {
         Key KeyReturn;
         String LocalString;
+        ResultSet LocalResults ;
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         ReDrawList();
         while (true) {
             Tsize = AttachedWDBM.terminal.getTerminalSize();
-            // AttachedWDBM.scrn.refresh();
-            LocalString = String.format(AttachedWDBM.ScrollingListFormat, ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
+            LocalString = String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
             ResultsCurrentRow = Results.getRow();
             IlluminateCurrentRow();
             AttachedWDBM.scrn.refresh();
@@ -145,7 +169,26 @@ public class indexscroll{
                     ReDrawList();
                     // scrollListDown(Wdbm);
                 }
-            } else if (KeyReturn.getKind() == Key.Kind.Enter) return KeyReturn;
+            } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
+                if (KeyReturn.getCharacter() == 's') {
+                    try {
+                        LocalString = wdbm.PromptForString("SQL Statement");
+                        CurrentCompiledSQLStatement = SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                        LocalResults = CurrentCompiledSQLStatement.executeQuery();
+                        if (LocalResults.first()) {
+                            Results = LocalResults;
+                            ScreenCurrentRow = 0;
+                            ResultsCurrentRow = Results.getRow();
+                            ReDrawList();
+                            CurrentSQLQuery = LocalString;
+                        }
+                    } catch (SQLException ex) {
+                        wdbm.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " Zen");
+                    }
+                }
+            } else if (KeyReturn.getKind() == Key.Kind.Enter) {
+                return KeyReturn;
+            }
         }
     }
 }
