@@ -47,33 +47,17 @@ import java.sql.SQLException;
 
 public class wdbm implements extools {
 
-    // public static String LineEditorBuffer = "";
-    //public static int LineEditorPosition = 0;
-    //public static Key LineEditorReturnKey = null;
     public static Terminal terminal;
     public static Screen scrn;
     public static ScreenWriter writer = null;
     public static List<String> FormTemplate = new ArrayList();
     public static List<String> FieldList = new ArrayList();
-   // public static List<String> ListList = new ArrayList();
     public static List<String> ServerDetails = new ArrayList();
     public static List<String> CurrentRecord = new ArrayList();
     public static List<String> ScrollingListFields = new ArrayList();
     public static String ScrollingListFormat;
     public static Connection SQLconnection;
     public static ResultSet CurrentRecordResultSet;
-    
-//    static final String BLANK = "                                                                                                                             ";
-
-
-    // The following regular expressions find the field templates embeded in the FormTemplate list
-    // Field Templates Look Like @1<<<<<<<<<<     @20<<<<<
-    // The Numbers being the link to the name of the field from the SQL database in the FieldList list
-    // These having been loaded in from the WDBM common data dictionary file 
-    // set up for the SQL database being edited.
-    
-//    public static final String REGEXToMatchEmbededFieldTemplate = "@\\d+<+"; 
-//    public static final String REGEXToMatchNumberEmbededInFieldTemplate = "\\d+";
     
    public static List<indexscroll> IndexScrolls = new ArrayList();
     
@@ -187,49 +171,6 @@ public class wdbm implements extools {
             iter++;
         }
     }
-/*
-    static void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
-        LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + CharacterToInsert + LineEditorBuffer.substring(LineEditorPosition); 
-    }
-    
-    static void DeleteCharacterFromLineEditorBuffer(){
-        LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
-    }
-    
-    static void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
-        writer.drawString(x + LineEditorBuffer.length(), y, " ");
-    }
-    
-    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
-        Key KeyReceived;
-        if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
-        else LineEditorBuffer = "";
-        if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
-        while (true) {
-            writer.drawString(x, y, LineEditorBuffer);
-            scrn.setCursorPosition(x + LineEditorPosition, y);
-            scrn.refresh();
-            LineEditorReturnKey = KeyReceived = KeyInput();
-            if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
-                InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
-                LineEditorPosition++;
-            } else if (KeyReceived.getKind() == Key.Kind.Backspace && LineEditorPosition > 0) {
-                LineEditorPosition--;
-                DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowDown && LineEditorPosition < LineEditorBuffer.length()) {   // using down arrow for delete key
-                DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowLeft && LineEditorPosition > 0) {
-                LineEditorPosition--;
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowRight && LineEditorPosition < LineEditorBuffer.length()) {
-                LineEditorPosition++;
-            } else if (KeyReceived.getKind() == Key.Kind.Enter || KeyReceived.getKind() == Key.Kind.Escape) {
-                return LineEditorBuffer;
-            }
-        }
-    }
- */
     
     public static void unpackCurrentRecord(ResultSet... SetThisAsCurrent) throws SQLException {
         String FieldValue;
@@ -286,9 +227,15 @@ public class wdbm implements extools {
                     scrn.clear();
                     int LastIndexScroll = IndexScrolls.size() - 1;
                     TerminalSize Tsize = terminal.getTerminalSize();
-                    if (Tsize.getRows()+4 > IndexScrolls.get(LastIndexScroll).ScreenCurrentRow)
-                        IndexScrolls.get(LastIndexScroll).ScreenCurrentRow = Tsize.getRows()-4;
-                    
+                    if (IndexScrolls.get(LastIndexScroll).ScreenCurrentRow < 0) {
+                        IndexScrolls.get(LastIndexScroll).ScreenCurrentRow = 0;
+                    }
+                    int LocalMaximum = IndexScrolls.get(LastIndexScroll).ScreenCurrentRow + IndexScrolls.get(LastIndexScroll).ListScreenTopLine;
+                    if (LocalMaximum > Tsize.getRows() - 4) {
+                        IndexScrolls.get(LastIndexScroll).ScreenCurrentRow
+                                = Tsize.getRows() - 4 - IndexScrolls.get(LastIndexScroll).ListScreenTopLine;
+                    }
+
                     IndexScrolls.get(LastIndexScroll).ReDrawList();
                     IndexScrolls.get(LastIndexScroll).IlluminateCurrentRow();
                     DisplayPrompt(Prompt[0]);
@@ -296,6 +243,7 @@ public class wdbm implements extools {
                 scrn.refresh();
             }
         }
+        
         return KeyReceived;
     }
     
@@ -325,8 +273,8 @@ public class wdbm implements extools {
                     && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
-    public static void CreateIndexScroll(String SQLQuery,wdbm AttachWDBM) throws SQLException {
-        indexscroll Temp = new indexscroll(SQLQuery,AttachWDBM);
+    public static void CreateIndexScroll(String SQLQuery,wdbm AttachWDBM,int... Dimensions) throws SQLException {
+        indexscroll Temp = new indexscroll(SQLQuery,AttachWDBM,Dimensions);
         IndexScrolls.add(Temp);
     }
   
