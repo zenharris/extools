@@ -17,10 +17,14 @@ public class Forms {
      * @param args the command line arguments
      */
     
+    
+   
+    
+    
     public static void main(String[] args) {
       try {
-          wdbm resieFile = new wdbm("resie.dict");
-          resieFile.CreateIndexScroll("SELECT * FROM resie order by unit_entitlement;",resieFile);
+          wdbm resieFile = new wdbm("prim.dict");
+          resieFile.CreateIndexScroll("SELECT * FROM prim order by joic_no;",resieFile);
           resieFile.ScrollingIndexAndEditLoop();
           
       } catch (Exception e) {
