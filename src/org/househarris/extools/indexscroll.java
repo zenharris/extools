@@ -135,6 +135,17 @@ public class indexscroll {
         AttachedWDBM.scrn.refresh();
     }
     
+    /**
+     *
+     * @throws SQLException
+     */
+    public void DeEmphasiseCurrentRow() throws SQLException {
+        
+        AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow,
+                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
+                Terminal.Color.WHITE, Terminal.Color.BLACK);
+    }
+    
     
     public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
         ResultSet LocalResults;
@@ -150,18 +161,12 @@ public class indexscroll {
  
     public Key DisplayList() throws SQLException,InterruptedException {
         Key KeyReturn;
-        String LocalString;
-        ResultSet LocalResults ;
-        
-        
-     
+        ResultSet LocalResults;
         TerminalSize Tsize;
         ReDrawList();
-        
         AttachedWDBM.scrn.refresh();
         while (true) {
             Tsize = AttachedWDBM.terminal.getTerminalSize();
-            LocalString = String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
             ResultsCurrentRow = Results.getRow();
             
             IlluminateCurrentRow();
@@ -172,7 +177,8 @@ public class indexscroll {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
                 if ((ListScreenLength == 0 || ScreenCurrentRow+1 < ListScreenLength)  && ListScreenTopLine+ScreenCurrentRow + 4 < Tsize.getRows()) {
-                    AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow++, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    DeEmphasiseCurrentRow();
+                    ScreenCurrentRow++;
                     Results.next();
                 } else {
                     Results.next();
@@ -181,7 +187,8 @@ public class indexscroll {
                 }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
                 if (ScreenCurrentRow > 0) {
-                    AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow--, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                    DeEmphasiseCurrentRow();
+                    ScreenCurrentRow--;
                     Results.previous();
                 } else {
                     Results.previous();
@@ -193,7 +200,7 @@ public class indexscroll {
                     try {
                         AttachedWDBM.Texaco.LineEditorBuffer = CurrentSQLQuery;
                         AttachedWDBM.Texaco.LineEditorPosition = CurrentSQLQuery.length();
-                        LocalString = AttachedWDBM.PromptForString("SQL Query");
+                        String LocalString = AttachedWDBM.PromptForString("SQL Query");
                         if (AttachedWDBM.Texaco.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
                             CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                             LocalResults = CurrentCompiledSQLStatement.executeQuery();
@@ -212,7 +219,7 @@ public class indexscroll {
                     }
                 }
             } else if (KeyReturn.getKind() == Key.Kind.Enter) {
-                 AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
+                DeEmphasiseCurrentRow();
                 return KeyReturn;
             }
         }
