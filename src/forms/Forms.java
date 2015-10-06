@@ -27,8 +27,6 @@ public class Forms {
     public static void main(String[] args) {
       try {
           wdbm resieFile = new wdbm("prim.dict");
-          resieFile.CreateIndexScroll();
-          resieFile.CreateAnyIndexScrolls();
           resieFile.ScrollingIndexAndEditLoop();
           resieFile.scrn.stopScreen();
       } catch (Exception e) {
