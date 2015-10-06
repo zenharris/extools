@@ -81,6 +81,8 @@ public class wdbm implements extools {
   
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
         OpenSQLfile();
+        IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
+        CreateAnyIndexScrolls();
     }
  
     /**
@@ -90,7 +92,7 @@ public class wdbm implements extools {
         scrn.stopScreen();
     }
     
-    public void OpenSQLfile() throws ClassNotFoundException,SQLException {
+    private void OpenSQLfile() throws ClassNotFoundException,SQLException {
             Class.forName("org.postgresql.Driver");
             SQLconnection = DriverManager.getConnection(ServerDetails.get(ServerDetails.size()-1),"postgres",""); // "jdbc:postgresql://10.8.0.1:5432/sewer","postgres", "");
             // SQLconnection.setAutoCommit(false);
@@ -118,7 +120,6 @@ public class wdbm implements extools {
                             break;
                         case 1:
                             FieldList.add(line);
-
                             break;
                         case 2:
                             if(LineNumber == 0){
@@ -141,33 +142,30 @@ public class wdbm implements extools {
         }
     }
     
-    public void CreateAnyIndexScrolls() throws SQLException {
-
+    private void CreateAnyIndexScrolls() throws SQLException {
         for (String Cursor : FieldList) {
             String[] FieldElements = Cursor.split(":");
             if (FieldElements[1].equals("listscroll")) {
                 IndexScrolls.add(new indexscroll(FieldElements[0], FieldElements[2], this, 10, 5));
-                findIndexScroll(FieldElements[0]).ConnectedForm = false;
+                IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
-
     }
     
-    public indexscroll findIndexScroll(String ScrollName) {
-        System.err.println(IndexScrolls.size());
+    /**
+     *
+     * @param ScrollName
+     * @return
+     */
+    public indexscroll IndexScroll(String ScrollName) {
         for (indexscroll SearchCursor : IndexScrolls) {
-            System.err.println(SearchCursor.IndexScrollName);
-
-            if (SearchCursor.IndexScrollName.equals(ScrollName)) {
-                System.out.println("Found IndexScroll");
-                return SearchCursor;
-            }
+            if (SearchCursor.IndexScrollName.equals(ScrollName)) return SearchCursor;
         }
         return null;
     }
 
 
-    static int ExtractFieldNumberFrom (String FieldTemplate){
+    private int ExtractFieldNumberFrom (String FieldTemplate){
         Pattern p = Pattern.compile(REGEXToMatchNumberEmbededInFieldTemplate);
         Matcher m = p.matcher(FieldTemplate);
         if (m.find()) return Integer.parseInt(FieldTemplate.substring(m.start(), m.end())); 
@@ -186,14 +184,12 @@ public class wdbm implements extools {
                 String FieldName = Field.split(":")[0];
                 if (Field.split(":")[1].equals("listscroll")) {
                     
-                    findIndexScroll(FieldName).ReDrawList();
+                    IndexScroll(FieldName).ReDrawList();
                     
 
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
-                    if (FieldValue == null) {
-                        FieldValue = "";
-                    }
+                    if (FieldValue == null)  FieldValue = "";
                     FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
                     FieldValue = PadToPrintingLength(FieldValue, FieldTemplate);
                     LineBuffer = LineBuffer.replaceFirst(REGEXToMatchEmbededFieldTemplate, FieldValue);
@@ -225,7 +221,7 @@ public class wdbm implements extools {
                 String FieldName = Field.split(":")[0];
                 if (Field.split(":")[1].equals("listscroll")) {
                     
-                    findIndexScroll(FieldName).DisplayList();
+                    Key ExitKey = IndexScroll(FieldName).DisplayList();
 
                 } else {
                     String FieldValue = CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -261,7 +257,6 @@ public class wdbm implements extools {
         writer.drawString(0, Tsize.getRows() - 1, BLANK);
         writer.drawString(0, Tsize.getRows() - 1, ErrorText);
         scrn.refresh();
-    //    KeyInput();
     }
     
     public void DisplayPrompt(String Prompt) {
@@ -274,10 +269,9 @@ public class wdbm implements extools {
     
     public String PromptForString(String Prompt) throws SQLException,InterruptedException{
         TerminalSize Tsize = terminal.getTerminalSize();
-        String LocalString;
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         writer.drawString(0, Tsize.getRows() - 2, Prompt);
-        LocalString = Texaco.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
+        String LocalString = Texaco.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         return LocalString;
     }
@@ -299,17 +293,12 @@ public class wdbm implements extools {
             if (scrn.resizePending()) {
                 if (Prompt.length > 0) {
                     scrn.clear();
-                    int LastIndexScroll = IndexScrolls.size() - 1;
                     TerminalSize Tsize = terminal.getTerminalSize();
-                    if (CurrentIndexScroll.ScreenCurrentRow < 0) {
-                       CurrentIndexScroll.ScreenCurrentRow = 0;
-                    }
-                    int LocalMaximum = CurrentIndexScroll.ScreenCurrentRow + IndexScrolls.get(LastIndexScroll).ListScreenTopLine;
-                    if (LocalMaximum > Tsize.getRows() - 4) {
+                    if (CurrentIndexScroll.ScreenCurrentRow < 0) CurrentIndexScroll.ScreenCurrentRow = 0;
+                    int LocalMaximum = CurrentIndexScroll.ScreenCurrentRow + CurrentIndexScroll.ListScreenTopLine;
+                    if (LocalMaximum > Tsize.getRows() - 4)
                         CurrentIndexScroll.ScreenCurrentRow
                                 = Tsize.getRows() - 4 - CurrentIndexScroll.ListScreenTopLine;
-                    }
-
                     CurrentIndexScroll.ReDrawList();
                     CurrentIndexScroll.IlluminateCurrentRow();
                     FormDisplay(CurrentIndexScroll.Results);
@@ -342,12 +331,8 @@ public class wdbm implements extools {
     }  
      
     public void ScrollingIndexAndEditLoop () throws SQLException,InterruptedException {
-        
         while (CurrentIndexScroll.DisplayList().getKind() != Key.Kind.Home) {
-            if (DisplayAndEditRecord(CurrentIndexScroll.Results).getKind() != Key.Kind.Home) {
-                
-                
-            }
+            if (DisplayAndEditRecord(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) return;
         }
         
      //   int LastIndexScroll = IndexScrolls.size() - 1;
@@ -357,7 +342,6 @@ public class wdbm implements extools {
     }
     
     public void CreateIndexScroll(int... Dimensions) throws SQLException {
-        // indexscroll Temp = new indexscroll(SQLQuery,AttachWDBM,Dimensions);
         IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
     }
   
