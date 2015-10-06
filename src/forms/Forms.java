@@ -1,13 +1,16 @@
 /*
  *    EXAMPLE MAIN LINE FIREING UP AND USING WDBM/extools TO OPEN AND EDIT
- *    an sql database under postgreSQL in the table "resie".
+ *    an sql database under postgreSQL using the table "resie".
  */
 package forms;
 
-import com.googlecode.lanterna.input.Key;
-import org.househarris.extools.indexscroll;
+//import com.googlecode.lanterna.LanternaException;
 import org.househarris.extools.wdbm;
-import static org.househarris.extools.wdbm.scrn;
+// import org.househarris.extools.wdbm.scrn;
+import com.googlecode.lanterna.terminal.*;
+import com.googlecode.lanterna.screen.*;
+import com.googlecode.lanterna.input.*;
+import com.googlecode.lanterna.TerminalFacade;
 
 
 
@@ -24,15 +27,17 @@ public class Forms {
     public static void main(String[] args) {
       try {
           wdbm resieFile = new wdbm("prim.dict");
-          resieFile.CreateIndexScroll("SELECT * FROM prim order by joic_no;",resieFile);
+          resieFile.CreateIndexScroll();
+          resieFile.CreateAnyIndexScrolls();
           resieFile.ScrollingIndexAndEditLoop();
-          
+          resieFile.scrn.stopScreen();
       } catch (Exception e) {
           System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
           //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
             // System.exit(0);
+               // wdbm.close();
       } finally {
-         wdbm.scrn.stopScreen();  
+      //   resieFile.scrn.stopScreen();  
       }
     }
 }
