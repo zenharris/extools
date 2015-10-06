@@ -33,10 +33,10 @@ import java.sql.SQLException;
  * @author harris
  */
 public class texaco implements extools {
-    String LineEditorBuffer = "";
-    int LineEditorPosition = 0;
-    Key LineEditorReturnKey;
-    wdbm AttachedWDBM;
+    public String LineEditorBuffer = "";
+    public int LineEditorPosition = 0;
+    public Key LineEditorReturnKey;
+    public wdbm AttachedWDBM;
     
    public texaco(wdbm Attach) throws IOException,ClassNotFoundException,SQLException {
        AttachedWDBM = Attach;
@@ -45,15 +45,15 @@ public class texaco implements extools {
 //        return X;
     }
    
-    void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
+    private void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + CharacterToInsert + LineEditorBuffer.substring(LineEditorPosition); 
     }
     
-    void DeleteCharacterFromLineEditorBuffer(){
+    private void DeleteCharacterFromLineEditorBuffer(){
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
     }
     
-    void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
+    private void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
         AttachedWDBM.writer.drawString(x + LineEditorBuffer.length(), y, " ");
     }
     
