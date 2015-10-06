@@ -32,39 +32,51 @@ import java.sql.SQLException;
  *
  * @author harris
  */
-public class texaco {
-    static String LineEditorBuffer = "";
-    static int LineEditorPosition = 0;
-    static Key LineEditorReturnKey;
+public class texaco implements extools {
+    String LineEditorBuffer = "";
+    int LineEditorPosition = 0;
+    Key LineEditorReturnKey;
+    wdbm AttachedWDBM;
     
-   public texaco(String DataDictionaryFilename) throws IOException,ClassNotFoundException,SQLException {
+   public texaco(wdbm Attach) throws IOException,ClassNotFoundException,SQLException {
+       AttachedWDBM = Attach;
 //        wdbm X = null;
 //        super(DataDictionaryFilename);
 //        return X;
     }
    
-    static void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
+    void InsertCharacterIntoLineEditorBuffer(char CharacterToInsert) {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + CharacterToInsert + LineEditorBuffer.substring(LineEditorPosition); 
     }
     
-    static void DeleteCharacterFromLineEditorBuffer(){
+    void DeleteCharacterFromLineEditorBuffer(){
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
     }
     
-    static void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
-        wdbm.writer.drawString(x + LineEditorBuffer.length(), y, " ");
+    void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
+        AttachedWDBM.writer.drawString(x + LineEditorBuffer.length(), y, " ");
     }
     
-    public static String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
+    /**
+     *
+     * @param x
+     * @param y
+     * @param LengthLimit
+     * @param InitialValue
+     * @return
+     * @throws SQLException
+     * @throws InterruptedException
+     */
+    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
 //        else LineEditorBuffer = "";
         if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
         while (true) {
-            wdbm.writer.drawString(x, y, LineEditorBuffer);
-            wdbm.scrn.setCursorPosition(x + LineEditorPosition, y);
-            wdbm.scrn.refresh();
-            LineEditorReturnKey = KeyReceived = wdbm.KeyInput();
+            AttachedWDBM.writer.drawString(x, y, LineEditorBuffer);
+            AttachedWDBM.scrn.setCursorPosition(x + LineEditorPosition, y);
+            AttachedWDBM.scrn.refresh();
+            LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput();
             if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
                 InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
                 LineEditorPosition++;
