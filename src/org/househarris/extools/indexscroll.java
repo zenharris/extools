@@ -35,21 +35,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import static org.househarris.extools.wdbm.IndexScrolls;
-//import static org.househarris.extools.wdbm.CurrentRecordResultSet;
-// import static org.househarris.extools.wdbm.ScrollingListFormat;
-//import static org.househarris.extools.wdbm.ScrollingListFields;
-//import static org.househarris.extools.wdbm.ValuesSubstitute;
-//import static org.househarris.extools.wdbm.terminal;
-//import static org.househarris.extools.wdbm.writer;
-//import static org.househarris.extools.wdbm.scrn;
-///import static org.househarris.extools.wdbm.KeyInput;
-import static org.househarris.extools.wdbm.SQLconnection;
-import static org.househarris.extools.texaco.*;
-
-//import static org.househarris.extools.wdbm.FormDisplay;
-//import static org.househarris.extools.wdbm.FormEditor;
-//import static org.househarris.extools.wdbm.unpackCurrentRecord;
 
 
 /**
@@ -57,36 +42,54 @@ import static org.househarris.extools.texaco.*;
  * @author harris
  */
 public class indexscroll {
-    public static ResultSet Results;
-    static int ScreenCurrentRow;
-    static int ResultsCurrentRow;
-    static int ListScreenTopLine = 0;
-    static int ListScreenLength = 0;
-    static String ScrollPrompt = "[Enter]Select          [S]QL Query                     [ARROWS]ScrollUP/DN             [Home]Exit";
-    static wdbm AttachedWDBM;
-    static Statement stmt;
-    static String CurrentSQLQuery;
-    static PreparedStatement CurrentCompiledSQLStatement;
+    public int ListScrollsIndex = 0;
+    public String IndexScrollName;
+    public boolean ConnectedForm = true;
+    
+    public ResultSet Results;
+    public int ScreenCurrentRow;
+    public int ResultsCurrentRow;
+    public int ListScreenTopLine = 0;
+    public int ListScreenLength = 0;
+    private final String ScrollPrompt = "[Enter]Select          [S]QL Query       [ARROWS]ScrollUP/DN             [Home]Exit";
+    public wdbm AttachedWDBM;
+    public Statement stmt;
+    public String CurrentSQLQuery;
+    public PreparedStatement CurrentCompiledSQLStatement;
 
 
-    public indexscroll(String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException {
+    public indexscroll(String ScrollName ,String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException {
+        this.Substitute = new ArrayList();
+        System.err.println("Making New Index Scroll :" + ScrollName);
         if(Dimensions.length > 0) ListScreenTopLine = Dimensions[0];
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
-        stmt = SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        stmt = WDBMAttach.SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         Results = stmt.executeQuery(SQLQuery);
+        if (!Results.first()) System.err.println("This returned nothing " + SQLQuery);     //      Empirical kudge ????
         ScreenCurrentRow = 0;
         ResultsCurrentRow = Results.getRow();
         AttachedWDBM = WDBMAttach;
         CurrentSQLQuery = SQLQuery;
+        IndexScrollName = ScrollName;
+        ListScrollsIndex = AttachedWDBM.IndexScrolls.size();
+    //    if (ScrollName.equals("default")) AttachedWDBM.CurrentIndexScroll = this;
+        System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
     
-    static List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-        List<String> Substitute = new ArrayList();
-        for(String FieldName : FieldNameList ) Substitute.add(Results.getString(FieldName));
+    private final List<String> Substitute;
+    private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
+       // List<String> Substitute = new ArrayList();
+       Substitute.clear();
+        
+        for(String FieldName : FieldNameList ){
+           // System.err.println(FieldName);
+           // System.err.println(AttachedWDBM.CurrentIndexScroll.Results.getString(FieldName));
+                Substitute.add(Results.getString(FieldName));
+        }
         return Substitute;
     }
     
-    static void scrollListUp (int CurrentScreenLine,wdbm Wdbm) throws SQLException {
+    private void scrollListUp (int CurrentScreenLine,wdbm Wdbm) throws SQLException {
        //int iter; 
        //int StartRow = Results.getRow() - CurrentScreenLine+1;
        //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
@@ -95,7 +98,7 @@ public class indexscroll {
        // }
     }
     
-    static void scrollListDown(wdbm Wdbm) throws SQLException {
+    private void scrollListDown(wdbm Wdbm) throws SQLException {
         //int iter;
         //int StartRow = Results.getRow();
         //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
@@ -105,30 +108,35 @@ public class indexscroll {
         //Results.absolute(StartRow-1);
     }
     
-    public static void ReDrawList() throws SQLException {
+   
+    
+    public void ReDrawList() throws SQLException {
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
+        if (SaveResultRow < 1) System.err.println("Something Wrong" + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
         if (startrow < 1) {
             startrow = 1;
-            ScreenCurrentRow = SaveResultRow-1;
+            ScreenCurrentRow = SaveResultRow -1;
         }
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
             AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
         }
+        // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
 
-    public static void IlluminateCurrentRow() throws SQLException {
+    public void IlluminateCurrentRow() throws SQLException {
         AttachedWDBM.scrn.putString(0, ListScreenTopLine+ScreenCurrentRow,
                 String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
+        AttachedWDBM.scrn.refresh();
     }
     
     
-    public static void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
+    public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
         ResultSet LocalResults;
             LocalResults = stmt.executeQuery(SQLQuery);
             if (LocalResults.first()) {
@@ -139,17 +147,26 @@ public class indexscroll {
             }
     }
     
-    public static Key DisplayList() throws SQLException,InterruptedException {
+ 
+    public Key DisplayList() throws SQLException,InterruptedException {
         Key KeyReturn;
         String LocalString;
         ResultSet LocalResults ;
-        TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
+        
+        
+     
+        TerminalSize Tsize;
         ReDrawList();
+        
+        AttachedWDBM.scrn.refresh();
         while (true) {
             Tsize = AttachedWDBM.terminal.getTerminalSize();
             LocalString = String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray());
             ResultsCurrentRow = Results.getRow();
+            
             IlluminateCurrentRow();
+            
+            if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
             AttachedWDBM.scrn.refresh();
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
@@ -174,25 +191,28 @@ public class indexscroll {
             } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
                 if (KeyReturn.getCharacter() == 's') {
                     try {
-                        LocalString = wdbm.PromptForString("SQL Statement");
-                        if (texaco.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
-                            CurrentCompiledSQLStatement = SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                        AttachedWDBM.Texaco.LineEditorBuffer = CurrentSQLQuery;
+                        AttachedWDBM.Texaco.LineEditorPosition = CurrentSQLQuery.length();
+                        LocalString = AttachedWDBM.PromptForString("SQL Query");
+                        if (AttachedWDBM.Texaco.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
+                            CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                             LocalResults = CurrentCompiledSQLStatement.executeQuery();
                             if (LocalResults.first()) {
                                 Results = LocalResults;
                                 ScreenCurrentRow = 0;
                                 ResultsCurrentRow = Results.getRow();
-                                wdbm.scrn.clear();
+                                AttachedWDBM.scrn.clear();
                                 ReDrawList();
                                 CurrentSQLQuery = LocalString;
-                                wdbm.DisplayError("");
+                                AttachedWDBM.DisplayError("");
                             }
                         }
                     } catch (SQLException ex) {
-                        wdbm.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
+                        AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
                     }
                 }
             } else if (KeyReturn.getKind() == Key.Kind.Enter) {
+                 AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow, LocalString, Terminal.Color.WHITE, Terminal.Color.BLACK);
                 return KeyReturn;
             }
         }
