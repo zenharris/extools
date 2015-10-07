@@ -27,6 +27,10 @@ public interface extools {
     public static final String SplittingColon = ":";
     public static final String IndexScrollFieldLabel = "listscroll";
 
+    /**
+     *
+     */
+    public static final String FormMenuPrompt = "[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit";
  //   public extools(){
  //   }
  //  public Key KeyInput(String... test);
