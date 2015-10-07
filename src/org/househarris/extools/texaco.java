@@ -30,7 +30,7 @@ import java.sql.SQLException;
 
 /**
  *
- * @author harris
+ * @author Zen Harris
  */
 public class texaco implements extools {
     public String LineEditorBuffer = "";
@@ -59,15 +59,16 @@ public class texaco implements extools {
     
     /**
      *
-     * @param x
+     * Inputs text with line editing features
+     * 
+     * @param x Screen Row
      * @param y
      * @param LengthLimit
      * @param InitialValue
      * @return
      * @throws SQLException
-     * @throws InterruptedException
      */
-    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
+    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
 //        else LineEditorBuffer = "";
