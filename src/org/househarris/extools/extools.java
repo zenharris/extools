@@ -7,9 +7,8 @@ package org.househarris.extools;
 
 /**
  *
- * @author harris
+ * @author Zen Harris
  */
-
 
 
 public interface extools {
@@ -23,9 +22,13 @@ public interface extools {
     // set up for the SQL database being edited.
     public static final String REGEXToMatchEmbededFieldTemplate = "@\\d+<+";
     public static final String REGEXToMatchNumberEmbededInFieldTemplate = "\\d+";
+    
+    
+    public static final String SplittingColon = ":";
+    public static final String IndexScrollFieldLabel = "listscroll";
 
  //   public extools(){
  //   }
- //   public void KeyInput(String... test);
-  //  public wdbm wdbm(String test);
+ //  public Key KeyInput(String... test);
+ // public wdbm wdbm(String test);
 }
