@@ -28,7 +28,7 @@ address:str:cap:
 suburb:str:cap:
 state:str:cap:
 postcode:str:cap:
-indexscroll:listscroll:select * from prim order by run:
+runscroll:listscroll:select * from prim order by run:
 %LIST_DEF%
 SELECT * FROM prim order by joic_no
 %4s| %-30.30s| %-20.20s| %-10.10s| %-10.10s
