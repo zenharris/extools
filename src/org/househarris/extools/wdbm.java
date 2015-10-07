@@ -52,7 +52,7 @@ import java.util.Date;
 public class wdbm implements extools {
 
     public Terminal terminal;
-    public Screen scrn;
+    public static Screen scrn;
     public ScreenWriter writer = null;
     public List<String> FormTemplate = new ArrayList();
     public List<String> FieldList = new ArrayList();
@@ -70,7 +70,7 @@ public class wdbm implements extools {
     /**
      *
      */
-    public texaco Texaco;
+    public texaco TextEditor;
 
     public wdbm(String DataDictionaryFilename) throws ClassNotFoundException,SQLException,IOException {
         terminal = TerminalFacade.createTerminal();
@@ -84,12 +84,12 @@ public class wdbm implements extools {
         writer = new ScreenWriter(scrn);
         writer.setForegroundColor(Terminal.Color.WHITE);
         writer.setBackgroundColor(Terminal.Color.BLACK);
-        Texaco = new texaco(this);
+        TextEditor = new texaco(this);
   
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
         OpenSQLfile();
         IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
-        CreateAnyIndexScrolls();
+        CreateAnyIndexScrollFields();
        
     }
  
@@ -97,8 +97,9 @@ public class wdbm implements extools {
      * Con Job Right On
      */
     public void close() {
-       scrn.stopScreen();
+     
     }
+    
     
     private void OpenSQLfile() throws ClassNotFoundException,SQLException {
             Class.forName("org.postgresql.Driver");
@@ -150,7 +151,7 @@ public class wdbm implements extools {
         }
     }
     
-    private void CreateAnyIndexScrolls() throws SQLException {
+    private void CreateAnyIndexScrollFields() throws SQLException {
         for (String Cursor : FieldList) {
             String[] FieldElements = Cursor.split(SplittingColon);
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
@@ -162,7 +163,7 @@ public class wdbm implements extools {
     
     /**
      *Search Index Scroll Stack to find scroll named in param.
-     * Returns it's indexscroll object. null if not found.
+     * Returns it's index scroll object. null if not found.
      * 
      * @param ScrollName    text name of scroll
      * @return
@@ -194,7 +195,7 @@ public class wdbm implements extools {
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     
-                    IndexScroll(FieldName).ReDrawList();
+                    IndexScroll(FieldName).ReDrawScroll();
 
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -235,9 +236,9 @@ public class wdbm implements extools {
                 } else {
                     String FieldValue = CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
                     FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
-                    Texaco.LineEditorPosition = 0;
-                    Texaco.LineEditor(m.start(), iter, FieldTemplate.length(), FieldValue);
-                    if (Texaco.LineEditorReturnKey.getKind() == Key.Kind.Escape) {
+                    TextEditor.LineEditorPosition = 0;
+                    TextEditor.LineEditor(m.start(), iter, FieldTemplate.length(), FieldValue);
+                    if (TextEditor.LineEditorReturnKey.getKind() == Key.Kind.Escape) {
                         return;
                     }
                 }
@@ -248,15 +249,17 @@ public class wdbm implements extools {
     
     private void unpackCurrentRecord(ResultSet... SetThisAsCurrent) throws SQLException {
         String FieldValue;
-        if (SetThisAsCurrent.length > 0) CurrentRecordResultSet = SetThisAsCurrent[0];
+        if (SetThisAsCurrent.length > 0) {
+            CurrentRecordResultSet = SetThisAsCurrent[0];
+        }
         CurrentRecord.clear();
         for (String FieldName : FieldList) {
-            if (FieldName.split(":")[1].equals("listscroll")){
-                
-            }else {
-            FieldValue = CurrentRecordResultSet.getString(FieldName.split(":")[0]);
-            if (FieldValue == null) FieldValue = "";              // Strange Processing for when feilds have a null value
-            CurrentRecord.add(FieldValue);
+            if (FieldName.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
+                ////  Ignore index scroll fields
+            } else {
+                FieldValue = CurrentRecordResultSet.getString(FieldName.split(SplittingColon)[0]);
+                if (FieldValue == null) FieldValue = "";              // Strange Processing for when feilds have a null value
+                CurrentRecord.add(FieldValue);
             }
         }
     }
@@ -280,7 +283,7 @@ public class wdbm implements extools {
         TerminalSize Tsize = terminal.getTerminalSize();
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         writer.drawString(0, Tsize.getRows() - 2, Prompt);
-        String LocalString = Texaco.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
+        String LocalString = TextEditor.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         return LocalString;
     }
@@ -307,7 +310,7 @@ public class wdbm implements extools {
             try {
                 Thread.sleep(1);
             } catch (InterruptedException ex) {
-                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " Keyboard Read");
+                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " sleep failed somehow KeyInput");
             }
             if (iter++ == 1000) {
                 thisSec = new Date(); //LocalTime.now();
@@ -327,7 +330,7 @@ public class wdbm implements extools {
                     if (LocalMaximum > Tsize.getRows() - 4)
                         CurrentIndexScroll.ScreenCurrentRow
                                 = Tsize.getRows() - 4 - CurrentIndexScroll.ListScreenTopLine;
-                    CurrentIndexScroll.ReDrawList();
+                    CurrentIndexScroll.ReDrawScroll();
                     CurrentIndexScroll.IlluminateCurrentRow();
                     FormDisplay(CurrentIndexScroll.Results);
                     DisplayPrompt(Prompt[0]);
@@ -339,13 +342,32 @@ public class wdbm implements extools {
         return KeyReceived;
     }
     
-     public Key DisplayAndEditRecord(ResultSet LocalResult) throws SQLException {
+    public String FindAnyIndexScrollFields() {
+        for (String SearchCursor : FieldList) {
+            if (SearchCursor.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
+                return SearchCursor.split(SplittingColon)[0];
+            }
+        }
+        return null;
+    }
+
+    /**
+     *
+     * @param LocalResult
+     * @return
+     * @throws SQLException
+     */
+    public Key ActivateForm(ResultSet LocalResult) throws SQLException {
         Key ExitedWithKey;
         do {
             FormDisplay(LocalResult);
-             // Key ExitKey = AttachedWDBM.IndexScroll("indexscroll").DisplayList();
-            ExitedWithKey = IndexScroll("indexscroll").DisplayList();
-         //   ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
+            String ScrollFieldName = FindAnyIndexScrollFields();
+            if (ScrollFieldName != null) {
+                ExitedWithKey = IndexScroll(ScrollFieldName).ActivateScroll();
+                DisplayPrompt(FormMenuPrompt);
+            } else {
+                ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
+            }
             if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
                 if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
                     LocalResult.next();
@@ -358,11 +380,11 @@ public class wdbm implements extools {
             }
         } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
         return ExitedWithKey;
-    }  
+    }
      
-    public void ScrollingIndexAndEditLoop () throws SQLException {
-        while (CurrentIndexScroll.DisplayList().getKind() != Key.Kind.Home) {
-            if (DisplayAndEditRecord(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) return;
+    public void ActivateWDBM () throws SQLException {
+        while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
+            if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) return;
         }
         
      //   int LastIndexScroll = IndexScrolls.size() - 1;
@@ -371,7 +393,7 @@ public class wdbm implements extools {
      //               && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
-    public void CreateIndexScroll(int... Dimensions) throws SQLException {
+    public void CreateDefaultIndexScroll(int... Dimensions) throws SQLException {
         IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
     }
   
