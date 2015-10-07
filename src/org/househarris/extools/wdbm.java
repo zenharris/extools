@@ -42,6 +42,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+//import java.lang.Object;
+import java.util.Date;
+// import java.text.SimpleDateFormat;
+
 
 // import java.sql.Statement;
 
@@ -61,7 +65,7 @@ public class wdbm implements extools {
     public ResultSet CurrentRecordResultSet;
     public indexscroll CurrentIndexScroll;
     
-   public List<indexscroll> IndexScrolls = new ArrayList();
+    public List<indexscroll> IndexScrolls = new ArrayList();
     
     /**
      *
@@ -70,6 +74,9 @@ public class wdbm implements extools {
 
     public wdbm(String DataDictionaryFilename) throws ClassNotFoundException,SQLException,IOException {
         terminal = TerminalFacade.createTerminal();
+        TerminalSize Tsize = terminal.getTerminalSize();
+        Tsize.setColumns(83); // Max 100
+        Tsize.setRows(30); //Max 30
         scrn = TerminalFacade.createScreen(terminal);
         scrn.startScreen();
         scrn.clear();
@@ -83,13 +90,14 @@ public class wdbm implements extools {
         OpenSQLfile();
         IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
         CreateAnyIndexScrolls();
+       
     }
  
     /**
-     *
+     * Con Job Right On
      */
     public void close() {
-        scrn.stopScreen();
+       scrn.stopScreen();
     }
     
     private void OpenSQLfile() throws ClassNotFoundException,SQLException {
@@ -144,8 +152,8 @@ public class wdbm implements extools {
     
     private void CreateAnyIndexScrolls() throws SQLException {
         for (String Cursor : FieldList) {
-            String[] FieldElements = Cursor.split(":");
-            if (FieldElements[1].equals("listscroll")) {
+            String[] FieldElements = Cursor.split(SplittingColon);
+            if (FieldElements[1].equals(IndexScrollFieldLabel)) {
                 IndexScrolls.add(new indexscroll(FieldElements[0], FieldElements[2], this, 10, 5));
                 IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
@@ -153,8 +161,10 @@ public class wdbm implements extools {
     }
     
     /**
-     *
-     * @param ScrollName
+     *Search Index Scroll Stack to find scroll named in param.
+     * Returns it's indexscroll object. null if not found.
+     * 
+     * @param ScrollName    text name of scroll
      * @return
      */
     public indexscroll IndexScroll(String ScrollName) {
@@ -181,11 +191,10 @@ public class wdbm implements extools {
             while (m.find()) {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
                 String Field = FieldList.get(ExtractFieldNumberFrom(FieldTemplate));
-                String FieldName = Field.split(":")[0];
-                if (Field.split(":")[1].equals("listscroll")) {
+                String FieldName = Field.split(SplittingColon)[0];
+                if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     
                     IndexScroll(FieldName).ReDrawList();
-                    
 
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -210,7 +219,7 @@ public class wdbm implements extools {
                 return(FieldValue);
     }
     
-    public void FormEditor() throws SQLException, InterruptedException {
+    public void FormEditor() throws SQLException{
         int iter = 0;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
         for (String LineBuffer : FormTemplate) {
@@ -218,10 +227,10 @@ public class wdbm implements extools {
             while (m.find()) {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
                 String Field = FieldList.get(ExtractFieldNumberFrom(FieldTemplate));
-                String FieldName = Field.split(":")[0];
-                if (Field.split(":")[1].equals("listscroll")) {
+                String FieldName = Field.split(SplittingColon)[0];
+                if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     
-                    Key ExitKey = IndexScroll(FieldName).DisplayList();
+                  //  Key ExitKey = IndexScroll(FieldName).DisplayList();
 
                 } else {
                     String FieldValue = CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -267,7 +276,7 @@ public class wdbm implements extools {
         scrn.setCursorPosition(2, Tsize.getRows() - 2);
     }
     
-    public String PromptForString(String Prompt) throws SQLException,InterruptedException{
+    public String PromptForString(String Prompt) throws SQLException {
         TerminalSize Tsize = terminal.getTerminalSize();
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         writer.drawString(0, Tsize.getRows() - 2, Prompt);
@@ -276,20 +285,39 @@ public class wdbm implements extools {
         return LocalString;
     }
     /**
-     *
+     * takes keyboard character and returns a Key object representation
+     * if optional prompt is provided as param then it will take input as
+     * if it is a menu bar prompt.
+     * 
      * @param Prompt
      * @return
      * @throws java.sql.SQLException
-     * @throws InterruptedException
      */
-    public Key KeyInput(String... Prompt) throws SQLException, InterruptedException {
+    
+    
+    public Key KeyInput(String... Prompt) throws SQLException {
         Key KeyReceived;
+        int iter = 0;
+        Date thisSec;
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0]);
             scrn.refresh();
         }
         while ((KeyReceived = scrn.readInput()) == null) {
-            Thread.sleep(1);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException ex) {
+                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " Keyboard Read");
+            }
+            if (iter++ == 1000) {
+                thisSec = new Date(); //LocalTime.now();
+                // implementation of display code is left to the reader
+                //display(thisSec.getHour(), thisSec.getMinute(), thisSec.getSecond());
+                TerminalSize Tsize = terminal.getTerminalSize();
+                writer.drawString(Tsize.getColumns()-30, 0, thisSec.toString());
+                scrn.refresh();
+                iter = 0;
+            }
             if (scrn.resizePending()) {
                 if (Prompt.length > 0) {
                     scrn.clear();
@@ -303,19 +331,21 @@ public class wdbm implements extools {
                     CurrentIndexScroll.IlluminateCurrentRow();
                     FormDisplay(CurrentIndexScroll.Results);
                     DisplayPrompt(Prompt[0]);
+                    DisplayError(String.format("Term Dimensions %3s col x %-3srow", Tsize.getColumns(), Tsize.getRows()));
                 }
                 scrn.refresh();
             }
         }
-        
         return KeyReceived;
     }
     
-     public Key DisplayAndEditRecord(ResultSet LocalResult) throws SQLException, InterruptedException {
+     public Key DisplayAndEditRecord(ResultSet LocalResult) throws SQLException {
         Key ExitedWithKey;
         do {
             FormDisplay(LocalResult);
-            ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
+             // Key ExitKey = AttachedWDBM.IndexScroll("indexscroll").DisplayList();
+            ExitedWithKey = IndexScroll("indexscroll").DisplayList();
+         //   ExitedWithKey = KeyInput("[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
             if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
                 if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
                     LocalResult.next();
@@ -330,7 +360,7 @@ public class wdbm implements extools {
         return ExitedWithKey;
     }  
      
-    public void ScrollingIndexAndEditLoop () throws SQLException,InterruptedException {
+    public void ScrollingIndexAndEditLoop () throws SQLException {
         while (CurrentIndexScroll.DisplayList().getKind() != Key.Kind.Home) {
             if (DisplayAndEditRecord(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) return;
         }
