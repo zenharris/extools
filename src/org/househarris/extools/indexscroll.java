@@ -56,10 +56,10 @@ public class indexscroll {
     public Statement stmt;
     public String CurrentSQLQuery;
     public PreparedStatement CurrentCompiledSQLStatement;
+    public List<String> SQLQueryHistory = new ArrayList();
 
 
     public indexscroll(String ScrollName ,String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException {
-        this.Substitute = new ArrayList();
         System.err.println("Making New Index Scroll :" + ScrollName);
         if(Dimensions.length > 0) ListScreenTopLine = Dimensions[0];
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
@@ -72,45 +72,19 @@ public class indexscroll {
         CurrentSQLQuery = SQLQuery;
         IndexScrollName = ScrollName;
         ListScrollsIndex = AttachedWDBM.IndexScrolls.size();
-    //    if (ScrollName.equals("default")) AttachedWDBM.CurrentIndexScroll = this;
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
     
-    private final List<String> Substitute;
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-       // List<String> Substitute = new ArrayList();
-       Substitute.clear();
-        
-        for(String FieldName : FieldNameList ){
-           // System.err.println(FieldName);
-           // System.err.println(AttachedWDBM.CurrentIndexScroll.Results.getString(FieldName));
-                Substitute.add(Results.getString(FieldName));
+        List<String> Substitute = new ArrayList();
+        Substitute.clear();
+        for (String FieldName : FieldNameList) {
+            Substitute.add(Results.getString(FieldName));
         }
         return Substitute;
     }
     
-    private void scrollListUp (int CurrentScreenLine,wdbm Wdbm) throws SQLException {
-       //int iter; 
-       //int StartRow = Results.getRow() - CurrentScreenLine+1;
-       //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-       //for (iter = 0; iter+3 < Tsize.getRows() && Results.absolute(StartRow++); iter++) {
-       //     Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-       // }
-    }
-    
-    private void scrollListDown(wdbm Wdbm) throws SQLException {
-        //int iter;
-        //int StartRow = Results.getRow();
-        //TerminalSize Tsize = Wdbm.terminal.getTerminalSize();
-        //for (iter = 0; iter + 3 < Tsize.getRows() && Results.absolute(StartRow+iter-1); iter++) {
-        //    Wdbm.writer.drawString(0, iter, String.format(Wdbm.ScrollingListFormat, ValuesSubstitute(Wdbm.ScrollingListFields).toArray()));
-        //}
-        //Results.absolute(StartRow-1);
-    }
-    
-   
-   
-    public void ReDrawList() throws SQLException {
+    public void ReDrawScroll() throws SQLException {
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
         if (SaveResultRow < 1) System.err.println("Something Wrong" + SaveResultRow);   /////Diagnostic
@@ -129,7 +103,7 @@ public class indexscroll {
     }
 
     public void IlluminateCurrentRow() throws SQLException {
-        AttachedWDBM.scrn.putString(0, ListScreenTopLine+ScreenCurrentRow,
+        AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
         AttachedWDBM.scrn.refresh();
@@ -145,34 +119,48 @@ public class indexscroll {
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
     
-    
-    public void ExecuteSQLQuery(String SQLQuery) throws SQLException, InterruptedException {
+    /**
+     *
+     * @param SQLQuery
+     * @throws SQLException
+     */
+    public void ExecuteSQLQuery(String SQLQuery) throws SQLException {
         ResultSet LocalResults;
-        LocalResults = stmt.executeQuery(SQLQuery);
-        if (LocalResults.first()) {
-            Results = LocalResults;
-            ScreenCurrentRow = 0;
-            ResultsCurrentRow = Results.getRow();
-            ReDrawList();
+        try {
+            AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
+            AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
+            String LocalString = AttachedWDBM.PromptForString("SQL Query");
+            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
+                CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                LocalResults = CurrentCompiledSQLStatement.executeQuery();
+                if (LocalResults.first()) {
+                    Results = LocalResults;
+                    ScreenCurrentRow = 0;
+                    ResultsCurrentRow = Results.getRow();
+                    AttachedWDBM.scrn.clear();
+                    ReDrawScroll();
+                    SQLQueryHistory.add(CurrentSQLQuery);
+                    CurrentSQLQuery = LocalString;
+                    AttachedWDBM.DisplayError("");
+                }
+            }
+        } catch (SQLException ex) {
+            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
         }
     }
   
  
-    public Key DisplayList() throws SQLException {
+    public Key ActivateScroll() throws SQLException {
         Key KeyReturn;
-        ResultSet LocalResults;
         TerminalSize Tsize;
-        ReDrawList();
+        ReDrawScroll();
         AttachedWDBM.scrn.refresh();
         while (true) {
             Tsize = AttachedWDBM.terminal.getTerminalSize();
             ResultsCurrentRow = Results.getRow();
-            
             IlluminateCurrentRow();
-            
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
             AttachedWDBM.scrn.refresh();
-            
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
@@ -182,8 +170,7 @@ public class indexscroll {
                     Results.next();
                 } else {
                     Results.next();
-                    ReDrawList();
-                    // scrollListUp(ScreenCurrentRow, Wdbm);
+                    ReDrawScroll();
                 }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
                 if (ScreenCurrentRow > 0) {
@@ -192,31 +179,11 @@ public class indexscroll {
                     Results.previous();
                 } else {
                     Results.previous();
-                    ReDrawList();
-                    // scrollListDown(Wdbm);
+                    ReDrawScroll();
                 }
             } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
                 if (KeyReturn.getCharacter() == 's') {
-                    try {
-                        AttachedWDBM.Texaco.LineEditorBuffer = CurrentSQLQuery;
-                        AttachedWDBM.Texaco.LineEditorPosition = CurrentSQLQuery.length();
-                        String LocalString = AttachedWDBM.PromptForString("SQL Query");
-                        if (AttachedWDBM.Texaco.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
-                            CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                            LocalResults = CurrentCompiledSQLStatement.executeQuery();
-                            if (LocalResults.first()) {
-                                Results = LocalResults;
-                                ScreenCurrentRow = 0;
-                                ResultsCurrentRow = Results.getRow();
-                                AttachedWDBM.scrn.clear();
-                                ReDrawList();
-                                CurrentSQLQuery = LocalString;
-                                AttachedWDBM.DisplayError("");
-                            }
-                        }
-                    } catch (SQLException ex) {
-                        AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
-                    }
+                    ExecuteSQLQuery(CurrentSQLQuery);
                 } else return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.Enter || KeyReturn.getKind() == Key.Kind.Escape) {
                 DeEmphasiseCurrentRow();
