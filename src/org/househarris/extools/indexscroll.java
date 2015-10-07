@@ -51,7 +51,7 @@ public class indexscroll {
     public int ResultsCurrentRow;
     public int ListScreenTopLine = 0;
     public int ListScreenLength = 0;
-    private final String ScrollPrompt = "[Enter]Select          [S]QL Query       [ARROWS]ScrollUP/DN             [Home]Exit";
+    private final String ScrollPrompt = "[Enter]Select          [S]QL Query       [ARROWS]ScrollUP/DN            [Home]Exit";
     public wdbm AttachedWDBM;
     public Statement stmt;
     public String CurrentSQLQuery;
@@ -109,7 +109,7 @@ public class indexscroll {
     }
     
    
-    
+   
     public void ReDrawList() throws SQLException {
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
@@ -140,26 +140,25 @@ public class indexscroll {
      * @throws SQLException
      */
     public void DeEmphasiseCurrentRow() throws SQLException {
-        
         AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
     
     
-    public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
+    public void ExecuteSQLQuery(String SQLQuery) throws SQLException, InterruptedException {
         ResultSet LocalResults;
-            LocalResults = stmt.executeQuery(SQLQuery);
-            if (LocalResults.first()) {
-                Results = LocalResults;
-                ScreenCurrentRow = 0;
-                ResultsCurrentRow = Results.getRow();
-                ReDrawList();
-            }
+        LocalResults = stmt.executeQuery(SQLQuery);
+        if (LocalResults.first()) {
+            Results = LocalResults;
+            ScreenCurrentRow = 0;
+            ResultsCurrentRow = Results.getRow();
+            ReDrawList();
+        }
     }
-    
+  
  
-    public Key DisplayList() throws SQLException,InterruptedException {
+    public Key DisplayList() throws SQLException {
         Key KeyReturn;
         ResultSet LocalResults;
         TerminalSize Tsize;
@@ -173,10 +172,11 @@ public class indexscroll {
             
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
             AttachedWDBM.scrn.refresh();
+            
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
-                if ((ListScreenLength == 0 || ScreenCurrentRow+1 < ListScreenLength)  && ListScreenTopLine+ScreenCurrentRow + 4 < Tsize.getRows()) {
+                if ((ListScreenLength == 0 || ScreenCurrentRow + 1 < ListScreenLength) && ListScreenTopLine + ScreenCurrentRow + 4 < Tsize.getRows()) {
                     DeEmphasiseCurrentRow();
                     ScreenCurrentRow++;
                     Results.next();
@@ -217,8 +217,8 @@ public class indexscroll {
                     } catch (SQLException ex) {
                         AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
                     }
-                }
-            } else if (KeyReturn.getKind() == Key.Kind.Enter) {
+                } else return KeyReturn;
+            } else if (KeyReturn.getKind() == Key.Kind.Enter || KeyReturn.getKind() == Key.Kind.Escape) {
                 DeEmphasiseCurrentRow();
                 return KeyReturn;
             }
