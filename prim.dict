@@ -6,11 +6,11 @@ Joic : @0<<  Name : @1<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                    Shire     : @4<<<<<<<<            @6<<<<<<<<<<<<<<<<<<<<<<<<<
                                                      @7<<<<<<     @8<<<<<<<<<<<<
 
-                                                                              
-                                                                              
 --------------------------------------------------------------------------------
                              Related  Records                                      
 @9<
+
+
 
 
 
@@ -28,9 +28,9 @@ address:str:cap:
 suburb:str:cap:
 state:str:cap:
 postcode:str:cap:
-runscroll:listscroll:select * from prim order by run:
+runscroll:listscroll:select * from prim where shire = '%s' order by instdate:shire:
 %LIST_DEF%
-SELECT * FROM prim order by joic_no
+SELECT * FROM prim order by name
 %4s| %-30.30s| %-20.20s| %-10.10s| %-10.10s
 joic_no
 name
