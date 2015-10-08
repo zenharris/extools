@@ -66,6 +66,8 @@ public class wdbm implements extools {
     public indexscroll CurrentIndexScroll;
     
     public List<indexscroll> IndexScrolls = new ArrayList();
+    public List<String> ErrorLog = new ArrayList();
+    public String CurrentErrorBuffer = "";
     
     /**
      *
@@ -145,7 +147,6 @@ public class wdbm implements extools {
                             ServerDetails.add(line);
                             break;
                     }
-
                 }
             }
         }
@@ -155,10 +156,19 @@ public class wdbm implements extools {
         for (String Cursor : FieldList) {
             String[] FieldElements = Cursor.split(SplittingColon);
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                IndexScrolls.add(new indexscroll(FieldElements[0], FieldElements[2], this, 10, 5));
+           //     ResolveSQLStatements(Cursor);
+           //     String Replacement = CurrentIndexScroll.Results.getString("run");//  roll("runscroll").toString(); //Results.getString("run");
+                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatements(Cursor), this, 10, 5));
                 IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
+    }
+    
+    
+    private String ResolveSQLStatements (String Cursor) throws SQLException{
+        String[] FieldElements = Cursor.split(SplittingColon);
+        String Replacement = CurrentIndexScroll.Results.getString(FieldElements[3]);
+        return String.format(FieldElements[2],Replacement);
     }
     
     /**
@@ -194,8 +204,9 @@ public class wdbm implements extools {
                 String Field = FieldList.get(ExtractFieldNumberFrom(FieldTemplate));
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
-                    
-                    IndexScroll(FieldName).ReDrawScroll();
+
+                    IndexScroll(FieldName).ReSearch(ResolveSQLStatements(Field));
+                    // IndexScroll(FieldName).ReDrawScroll();
 
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -269,6 +280,10 @@ public class wdbm implements extools {
         writer.drawString(0, Tsize.getRows() - 1, BLANK);
         writer.drawString(0, Tsize.getRows() - 1, ErrorText);
         scrn.refresh();
+        
+        if (CurrentErrorBuffer != "") ErrorLog.add(ErrorText);
+        CurrentErrorBuffer = ErrorText;
+        
     }
     
     public void DisplayPrompt(String Prompt) {
@@ -287,6 +302,7 @@ public class wdbm implements extools {
         writer.drawString(0, Tsize.getRows() - 2, BLANK);
         return LocalString;
     }
+
     /**
      * takes keyboard character and returns a Key object representation
      * if optional prompt is provided as param then it will take input as
@@ -296,12 +312,12 @@ public class wdbm implements extools {
      * @return
      * @throws java.sql.SQLException
      */
-    
-    
     public Key KeyInput(String... Prompt) throws SQLException {
         Key KeyReceived;
         int iter = 0;
         Date thisSec;
+        int FromCharacter = 0;
+
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0]);
             scrn.refresh();
@@ -318,9 +334,26 @@ public class wdbm implements extools {
                 //display(thisSec.getHour(), thisSec.getMinute(), thisSec.getSecond());
                 TerminalSize Tsize = terminal.getTerminalSize();
                 writer.drawString(Tsize.getColumns()-30, 0, thisSec.toString());
-                scrn.refresh();
                 iter = 0;
+                scrn.refresh();
+            }else if (iter == 0 || iter == 250 || iter == 500 || iter == 750 ){
+      
+                if (CurrentErrorBuffer.length() > 0) {
+                    TerminalSize Tsize = terminal.getTerminalSize();
+                    writer.drawString(0, Tsize.getRows() - 1, BLANK);
+                    writer.drawString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
+                    scrn.refresh();
+                    if (FromCharacter + Tsize.getColumns() > CurrentErrorBuffer.length()+5) {
+                        FromCharacter = 0;
+                    }
+                    scrn.refresh();
+                }
+
             }
+   
+            
+            
+           
             if (scrn.resizePending()) {
                 if (Prompt.length > 0) {
                     scrn.clear();
@@ -341,6 +374,7 @@ public class wdbm implements extools {
         }
         return KeyReceived;
     }
+
     
     public String FindAnyIndexScrollFields() {
         for (String SearchCursor : FieldList) {
