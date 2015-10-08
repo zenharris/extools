@@ -41,7 +41,7 @@ import java.util.List;
  *
  * @author harris
  */
-public class indexscroll {
+public class indexscroll implements extools {
     public int ListScrollsIndex = 0;
     public String IndexScrollName;
     public boolean ConnectedForm = true;
@@ -63,6 +63,7 @@ public class indexscroll {
         System.err.println("Making New Index Scroll :" + ScrollName);
         if(Dimensions.length > 0) ListScreenTopLine = Dimensions[0];
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
+        
         stmt = WDBMAttach.SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         Results = stmt.executeQuery(SQLQuery);
         if (!Results.first()) System.err.println("This returned nothing " + SQLQuery);     //      Empirical kudge ????
@@ -83,21 +84,31 @@ public class indexscroll {
         }
         return Substitute;
     }
-    
+
+    private String ResolveSQLStatements (String Cursor) throws SQLException{
+        String[] FieldElements = Cursor.split(SplittingColon);
+        String Replacement = Results.getString(FieldElements[3]);
+        return String.format(FieldElements[2],Replacement);
+    }
+           
+            
     public void ReDrawScroll() throws SQLException {
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
-        if (SaveResultRow < 1) System.err.println("Something Wrong" + SaveResultRow);   /////Diagnostic
+        if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something Wrong " + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
         if (startrow < 1) {
             startrow = 1;
             ScreenCurrentRow = SaveResultRow -1;
         }
+        
+        
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
             AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
         }
+        while (iter++ <= ListScreenLength) AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, BLANK);
         // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
@@ -121,6 +132,25 @@ public class indexscroll {
     
     /**
      *
+     * @param NewSQLQuery
+     * @throws SQLException
+     */
+    public void ReSearch(String NewSQLQuery) throws SQLException {
+        ResultSet LocalResults;
+        CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+        LocalResults = CurrentCompiledSQLStatement.executeQuery();
+        if (LocalResults.first()) {
+            Results = LocalResults;
+            ScreenCurrentRow = 0;
+            ResultsCurrentRow = Results.getRow();
+            // AttachedWDBM.scrn.clear();
+            ReDrawScroll();
+            // SQLQueryHistory.add(CurrentSQLQuery);
+            CurrentSQLQuery = NewSQLQuery;
+        }
+    }
+    /**
+     *
      * @param SQLQuery
      * @throws SQLException
      */
@@ -137,7 +167,7 @@ public class indexscroll {
                     Results = LocalResults;
                     ScreenCurrentRow = 0;
                     ResultsCurrentRow = Results.getRow();
-                    AttachedWDBM.scrn.clear();
+                    // AttachedWDBM.scrn.clear();
                     ReDrawScroll();
                     SQLQueryHistory.add(CurrentSQLQuery);
                     CurrentSQLQuery = LocalString;
