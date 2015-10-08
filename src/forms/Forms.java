@@ -4,13 +4,7 @@
  */
 package forms;
 
-//import com.googlecode.lanterna.LanternaException;
 import org.househarris.extools.wdbm;
-// import org.househarris.extools.wdbm.scrn;
-import com.googlecode.lanterna.terminal.*;
-import com.googlecode.lanterna.screen.*;
-import com.googlecode.lanterna.input.*;
-import com.googlecode.lanterna.TerminalFacade;
 
 
 
@@ -19,10 +13,6 @@ public class Forms {
     /**
      * @param args the command line arguments
      */
-    
-    
-   
-    
     
     public static void main(String[] args) {
       try {
