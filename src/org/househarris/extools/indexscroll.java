@@ -95,20 +95,19 @@ public class indexscroll implements extools {
     public void ReDrawScroll() throws SQLException {
         TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
-        if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something Wrong " + SaveResultRow);   /////Diagnostic
+        if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
         if (startrow < 1) {
             startrow = 1;
             ScreenCurrentRow = SaveResultRow -1;
         }
-        
-        
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
             AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
         }
-        while (iter++ <= ListScreenLength) AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, BLANK);
+        iter--;
+        while (iter++ < ListScreenLength-1) AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, BLANK);
         // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
