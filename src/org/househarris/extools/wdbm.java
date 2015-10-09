@@ -158,7 +158,7 @@ public class wdbm implements extools {
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
            //     ResolveSQLStatements(Cursor);
            //     String Replacement = CurrentIndexScroll.Results.getString("run");//  roll("runscroll").toString(); //Results.getString("run");
-                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatements(Cursor), this, 10, 5));
+                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatements(Cursor), this, 10, 6));
                 IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
