@@ -51,9 +51,9 @@ import java.util.Date;
 
 public class wdbm implements extools {
 
-    public Terminal terminal;
-    public static Screen scrn;
-    public ScreenWriter writer = null;
+    public Terminal rawTerminal;
+    public static Screen screenHandle;
+    public ScreenWriter screenWriter = null;
     public List<String> FormTemplate = new ArrayList();
     public List<String> FieldList = new ArrayList();
     public List<String> ServerDetails = new ArrayList();
@@ -75,17 +75,17 @@ public class wdbm implements extools {
     public texaco TextEditor;
 
     public wdbm(String DataDictionaryFilename) throws ClassNotFoundException,SQLException,IOException {
-        terminal = TerminalFacade.createTerminal();
-        TerminalSize Tsize = terminal.getTerminalSize();
+        rawTerminal = TerminalFacade.createTerminal();
+        TerminalSize Tsize = rawTerminal.getTerminalSize();
         Tsize.setColumns(83); // Max 100
         Tsize.setRows(30); //Max 30
-        scrn = TerminalFacade.createScreen(terminal);
-        scrn.startScreen();
-        scrn.clear();
-        scrn.refresh();
-        writer = new ScreenWriter(scrn);
-        writer.setForegroundColor(Terminal.Color.WHITE);
-        writer.setBackgroundColor(Terminal.Color.BLACK);
+        screenHandle = TerminalFacade.createScreen(rawTerminal);
+        screenHandle.startScreen();
+        screenHandle.clear();
+        screenHandle.refresh();
+        screenWriter = new ScreenWriter(screenHandle);
+        screenWriter.setForegroundColor(Terminal.Color.WHITE);
+        screenWriter.setBackgroundColor(Terminal.Color.BLACK);
         TextEditor = new texaco(this);
   
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
@@ -158,15 +158,72 @@ public class wdbm implements extools {
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
            //     ResolveSQLStatements(Cursor);
            //     String Replacement = CurrentIndexScroll.Results.getString("run");//  roll("runscroll").toString(); //Results.getString("run");
-                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatements(Cursor), this, 10, 6));
+                
+                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementIn(Cursor), this, ReturnFieldSpec(FieldElements[0])));
                 IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
     }
     
+    public void CreateDefaultIndexScroll(int... Dimensions) throws SQLException {
+        IndexScrolls.add(CurrentIndexScroll = new indexscroll("default", ScrollingListDefaultSearchSQL, this, FormTemplate.size()));
+    }
+
+   
+    public int GetFieldNumber(String FieldName) throws SQLException{
+       int LineCounter = 0;
+        for (String Searcher : FieldList) {
+            if (Searcher.split(SplittingColon)[0].equals(FieldName)) {
+                return LineCounter;
+            }
+            LineCounter++;
+        }
+        throw new SQLException("No Field Named "+FieldName);
+    }
+
     
-    private String ResolveSQLStatements (String Cursor) throws SQLException{
-        String[] FieldElements = Cursor.split(SplittingColon);
+    public int[] ReturnFieldSpec(String FieldName) throws SQLException {
+        int row = 0;
+        int column = 0;
+        int width = 0;
+        int length = 0;
+//        String type;
+        //      int number;
+        int LineCounter = 0;
+        boolean firstTime = true;
+
+        String SearchRegex = String.format("@%s<+", GetFieldNumber(FieldName));
+        Pattern p = Pattern.compile(SearchRegex);
+        for (String LocalBuffer : FormTemplate) {
+            Matcher m = p.matcher(LocalBuffer);
+            while (m.find()) {
+                // if (m.find()) {
+                length++;
+                if (firstTime) {
+                    row = LineCounter;
+                    column = m.start();
+                    width = m.end() - m.start();
+                    firstTime = false;
+                }
+            }
+            LineCounter++;
+        }
+        int[] returnArray = {row, length, width};
+        return returnArray;
+    }
+
+
+    /**
+     * Constructs SQL statement from the template embeded in a form field definition
+     * from the dictionary file. Gets values from current result set.
+     * 
+     * @param Cursor
+     * @return
+     * @throws SQLException 
+     */
+    
+    private String ResolveSQLStatementIn (String FormFieldDefinition) throws SQLException{
+        String[] FieldElements = FormFieldDefinition.split(SplittingColon);
         String Replacement = CurrentIndexScroll.Results.getString(FieldElements[3]);
         return String.format(FieldElements[2],Replacement);
     }
@@ -185,7 +242,14 @@ public class wdbm implements extools {
         return null;
     }
 
-
+/**
+ * Get the number value from the form template field token in the dictionary file and return it.
+ * identifies the form field definition that corresponds to this form field item.
+ * looks up FieldList to find it.
+ * 
+ * @param FieldTemplate
+ * @return 
+ */
     private int ExtractFieldNumberFrom (String FieldTemplate){
         Pattern p = Pattern.compile(REGEXToMatchNumberEmbededInFieldTemplate);
         Matcher m = p.matcher(FieldTemplate);
@@ -205,21 +269,22 @@ public class wdbm implements extools {
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
 
-                    IndexScroll(FieldName).ReSearch(ResolveSQLStatements(Field));
+                    IndexScroll(FieldName).ReSearch(ResolveSQLStatementIn(Field));
                     // IndexScroll(FieldName).ReDrawScroll();
-
+                    LineBuffer = "";
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
                     if (FieldValue == null)  FieldValue = "";
                     FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
                     FieldValue = PadToPrintingLength(FieldValue, FieldTemplate);
                     LineBuffer = LineBuffer.replaceFirst(REGEXToMatchEmbededFieldTemplate, FieldValue);
+                    
                 }
             }
-            writer.drawString(0, iter, LineBuffer);
+            screenWriter.drawString(0, iter, LineBuffer);
             iter++;
         }
-        scrn.refresh();
+        screenHandle.refresh();
     }
 
     private String PadToPrintingLength (String FieldValue, String FieldTemplate){
@@ -266,7 +331,7 @@ public class wdbm implements extools {
         CurrentRecord.clear();
         for (String FieldName : FieldList) {
             if (FieldName.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
-                ////  Ignore index scroll fields
+                ////  Ignore index scroll fields, they are not real.
             } else {
                 FieldValue = CurrentRecordResultSet.getString(FieldName.split(SplittingColon)[0]);
                 if (FieldValue == null) FieldValue = "";              // Strange Processing for when feilds have a null value
@@ -276,30 +341,30 @@ public class wdbm implements extools {
     }
 
     public void DisplayError(String ErrorText) {
-        TerminalSize Tsize = terminal.getTerminalSize();
-        writer.drawString(0, Tsize.getRows() - 1, BLANK);
-        writer.drawString(0, Tsize.getRows() - 1, ErrorText);
-        scrn.refresh();
+        TerminalSize Tsize = rawTerminal.getTerminalSize();
+        screenWriter.drawString(0, Tsize.getRows() - 1, BLANK);
+        screenWriter.drawString(0, Tsize.getRows() - 1, ErrorText);
+        screenHandle.refresh();
         
-        if (CurrentErrorBuffer != "") ErrorLog.add(ErrorText);
+        if (CurrentErrorBuffer.equals("")) ErrorLog.add(ErrorText);
         CurrentErrorBuffer = ErrorText;
         
     }
     
     public void DisplayPrompt(String Prompt) {
-        TerminalSize Tsize = terminal.getTerminalSize();
-        writer.drawString(0, Tsize.getRows() - 3, BLANK);
-        writer.drawString(0, Tsize.getRows() - 3, Prompt);
-        writer.drawString(0, Tsize.getRows() - 2, "?: ");
-        scrn.setCursorPosition(2, Tsize.getRows() - 2);
+        TerminalSize Tsize = rawTerminal.getTerminalSize();
+        screenWriter.drawString(0, Tsize.getRows() - 3, BLANK);
+        screenWriter.drawString(0, Tsize.getRows() - 3, Prompt);
+        screenWriter.drawString(0, Tsize.getRows() - 2, "?: ");
+        screenHandle.setCursorPosition(2, Tsize.getRows() - 2);
     }
     
     public String PromptForString(String Prompt) throws SQLException {
-        TerminalSize Tsize = terminal.getTerminalSize();
-        writer.drawString(0, Tsize.getRows() - 2, BLANK);
-        writer.drawString(0, Tsize.getRows() - 2, Prompt);
+        TerminalSize Tsize = rawTerminal.getTerminalSize();
+        screenWriter.drawString(0, Tsize.getRows() - 2, BLANK);
+        screenWriter.drawString(0, Tsize.getRows() - 2, Prompt);
         String LocalString = TextEditor.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
-        writer.drawString(0, Tsize.getRows() - 2, BLANK);
+        screenWriter.drawString(0, Tsize.getRows() - 2, BLANK);
         return LocalString;
     }
 
@@ -320,9 +385,9 @@ public class wdbm implements extools {
 
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0]);
-            scrn.refresh();
+            screenHandle.refresh();
         }
-        while ((KeyReceived = scrn.readInput()) == null) {
+        while ((KeyReceived = screenHandle.readInput()) == null) {
             try {
                 Thread.sleep(1);
             } catch (InterruptedException ex) {
@@ -332,32 +397,29 @@ public class wdbm implements extools {
                 thisSec = new Date(); //LocalTime.now();
                 // implementation of display code is left to the reader
                 //display(thisSec.getHour(), thisSec.getMinute(), thisSec.getSecond());
-                TerminalSize Tsize = terminal.getTerminalSize();
-                writer.drawString(Tsize.getColumns()-30, 0, thisSec.toString());
+                TerminalSize Tsize = rawTerminal.getTerminalSize();
+                screenWriter.drawString(Tsize.getColumns()-30, 0, thisSec.toString());
                 iter = 0;
-                scrn.refresh();
-            }else if (iter == 0 || iter == 250 || iter == 500 || iter == 750 ){
+                screenHandle.refresh();
+            }else if (iter == 1 || iter == 200 || iter == 400 || iter == 600 || iter == 800 || iter == 1000 ){
       
                 if (CurrentErrorBuffer.length() > 0) {
-                    TerminalSize Tsize = terminal.getTerminalSize();
-                    writer.drawString(0, Tsize.getRows() - 1, BLANK);
-                    writer.drawString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
-                    scrn.refresh();
+                    TerminalSize Tsize = rawTerminal.getTerminalSize();
+                    screenWriter.drawString(0, Tsize.getRows() - 1, BLANK);
+                    screenWriter.drawString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
+                    screenHandle.refresh();
                     if (FromCharacter + Tsize.getColumns() > CurrentErrorBuffer.length()+5) {
                         FromCharacter = 0;
                     }
-                    scrn.refresh();
+                    screenHandle.refresh();
                 }
 
             }
    
-            
-            
-           
-            if (scrn.resizePending()) {
+            if (screenHandle.resizePending()) {
                 if (Prompt.length > 0) {
-                    scrn.clear();
-                    TerminalSize Tsize = terminal.getTerminalSize();
+                    screenHandle.clear();
+                    TerminalSize Tsize = rawTerminal.getTerminalSize();
                     if (CurrentIndexScroll.ScreenCurrentRow < 0) CurrentIndexScroll.ScreenCurrentRow = 0;
                     int LocalMaximum = CurrentIndexScroll.ScreenCurrentRow + CurrentIndexScroll.ListScreenTopLine;
                     if (LocalMaximum > Tsize.getRows() - 4)
@@ -369,7 +431,7 @@ public class wdbm implements extools {
                     DisplayPrompt(Prompt[0]);
                     DisplayError(String.format("Term Dimensions %3s col x %-3srow", Tsize.getColumns(), Tsize.getRows()));
                 }
-                scrn.refresh();
+                screenHandle.refresh();
             }
         }
         return KeyReceived;
@@ -417,19 +479,23 @@ public class wdbm implements extools {
     }
      
     public void ActivateWDBM () throws SQLException {
-        while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
-            if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) return;
+        try {
+            while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
+                if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
+                    return;
+                }
+            }
+        } catch (SQLException ex) {
+            DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLstate " + ex.getSQLState());
+            ex.printStackTrace();
         }
         
      //   int LastIndexScroll = IndexScrolls.size() - 1;
      //   if (IndexScrolls.get(LastIndexScroll).Results.first()) 
      //       while (IndexScrolls.get(LastIndexScroll).DisplayList("default").getKind() != Key.Kind.Home
-     //               && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
+     //               && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndjavaexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
-    public void CreateDefaultIndexScroll(int... Dimensions) throws SQLException {
-        IndexScrolls.add(CurrentIndexScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
-    }
-  
+   
     
 }     
