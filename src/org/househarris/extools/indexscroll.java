@@ -1,6 +1,6 @@
 /*
  *
- *                WDBM Database Development Project
+ *              WDBM/extools Database Development Project
  *       Rewritten In Java By Zen Harris 2015 househarris@b5.net
  *                  From the original code in Perl
  *     Copyright (C) 1993   Michael Brown mbrown@scorch.hna.com.au
@@ -93,7 +93,7 @@ public class indexscroll implements extools {
            
             
     public void ReDrawScroll() throws SQLException {
-        TerminalSize Tsize = AttachedWDBM.terminal.getTerminalSize();
+        TerminalSize Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
         if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
@@ -103,20 +103,20 @@ public class indexscroll implements extools {
         }
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
+            AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
         }
         iter--;
-        while (iter++ < ListScreenLength-1) AttachedWDBM.writer.drawString(0, ListScreenTopLine+iter, BLANK);
+        while (iter++ < ListScreenLength-1) AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, BLANK);
         // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
 
     public void IlluminateCurrentRow() throws SQLException {
-        AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
-        AttachedWDBM.scrn.refresh();
+        AttachedWDBM.screenHandle.refresh();
     }
     
     /**
@@ -124,7 +124,7 @@ public class indexscroll implements extools {
      * @throws SQLException
      */
     public void DeEmphasiseCurrentRow() throws SQLException {
-        AttachedWDBM.scrn.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
@@ -158,7 +158,7 @@ public class indexscroll implements extools {
         try {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
-            String LocalString = AttachedWDBM.PromptForString("SQL Query");
+            String LocalString = AttachedWDBM.PromptForString("->");
             if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
                 CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                 LocalResults = CurrentCompiledSQLStatement.executeQuery();
@@ -174,7 +174,8 @@ public class indexscroll implements extools {
                 }
             }
         } catch (SQLException ex) {
-            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " ZenXoan");
+            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() +" SQLState "+ex.getSQLState());
+            ex.printStackTrace();
         }
     }
   
@@ -183,13 +184,15 @@ public class indexscroll implements extools {
         Key KeyReturn;
         TerminalSize Tsize;
         ReDrawScroll();
-        AttachedWDBM.scrn.refresh();
+        AttachedWDBM.screenHandle.refresh();
+        
+        
         while (true) {
-            Tsize = AttachedWDBM.terminal.getTerminalSize();
+            Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
             ResultsCurrentRow = Results.getRow();
             IlluminateCurrentRow();
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
-            AttachedWDBM.scrn.refresh();
+            AttachedWDBM.screenHandle.refresh();
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
