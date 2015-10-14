@@ -476,15 +476,16 @@ public class wdbm implements extools {
         return ExitedWithKey;
     }
      
-    public void ActivateWDBM () throws SQLException,InterruptedException {
-    //    Thread t = new Thread(new ScrollthenFormLoop());
-    //    t.start();
+    private Thread ActivatedWDBM;
+    public void ActivateWDBM (boolean... Daemonise) throws SQLException,InterruptedException {
+       ActivatedWDBM = new Thread(new QuantumExecuteActivateWDBM());
+       ActivatedWDBM.start();
+       
+       if (Daemonise.length> 0 && !Daemonise[0]) ActivatedWDBM.join();
         
-    //    while (t.isAlive())t.join(1000);
+      //  screenHandle.stopScreen();
         
-        
-        
-      try {
+    /*  try {
             while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
                 if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
                     return;
@@ -495,25 +496,25 @@ public class wdbm implements extools {
             ex.printStackTrace();
         } finally {
             screenHandle.stopScreen();
-        }
+        }*/
     }
     
-    public class ScrollthenFormLoop implements Runnable {
+    public class QuantumExecuteActivateWDBM implements Runnable {
 
         @Override
         public void run() {
             try {
-
                 while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
                     if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
-                        return;
+                        return; //throw new SQLException("Exiting Exception ");
                     }
                 }
             } catch (Exception ex) {
-                // DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
+                DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
                 ex.printStackTrace();
+            } finally {
+               screenHandle.stopScreen(); 
             }
-
         }
     }
    
