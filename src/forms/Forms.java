@@ -17,7 +17,9 @@ public class Forms {
     public static void main(String[] args) {
       try {
           
-          wdbm resieFile = new wdbm("prim.dict");
+          wdbm primaryFile = new wdbm("prim.dict");
+          wdbm resieFile = new wdbm("resie.dict");
+          primaryFile.ActivateWDBM();
           resieFile.ActivateWDBM();
           
       } catch (Exception e) {
