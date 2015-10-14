@@ -68,7 +68,7 @@ public class texaco implements extools {
      * @return
      * @throws SQLException
      */
-    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException {
+    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException,InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
 //        else LineEditorBuffer = "";
