@@ -24,9 +24,6 @@ public class Forms {
           e.printStackTrace();
           System.err.println(e.getClass().getName() + ": " + e.getMessage() + "Zen");
           //    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-      } finally {
-          wdbm.screenHandle.stopScreen();
-      //   resieFile.scrn.stopScreen();  
       }
     }
 }
