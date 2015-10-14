@@ -52,7 +52,7 @@ import java.util.Date;
 public class wdbm implements extools {
 
     public Terminal rawTerminal;
-    public static Screen screenHandle;
+    public Screen screenHandle;
     public ScreenWriter screenWriter = null;
     public List<String> FormTemplate = new ArrayList();
     public List<String> FieldList = new ArrayList();
@@ -159,7 +159,7 @@ public class wdbm implements extools {
            //     ResolveSQLStatements(Cursor);
            //     String Replacement = CurrentIndexScroll.Results.getString("run");//  roll("runscroll").toString(); //Results.getString("run");
                 
-                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementIn(Cursor), this, ReturnFieldSpec(FieldElements[0])));
+                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementIn(Cursor), this, FieldDimensions(FieldElements[0])));
                 IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
@@ -182,7 +182,7 @@ public class wdbm implements extools {
     }
 
     
-    public int[] ReturnFieldSpec(String FieldName) throws SQLException {
+    public int[] FieldDimensions(String FieldName) throws SQLException {
         int row = 0;
         int column = 0;
         int width = 0;
@@ -197,7 +197,6 @@ public class wdbm implements extools {
         for (String LocalBuffer : FormTemplate) {
             Matcher m = p.matcher(LocalBuffer);
             while (m.find()) {
-                // if (m.find()) {
                 length++;
                 if (firstTime) {
                     row = LineCounter;
@@ -221,7 +220,6 @@ public class wdbm implements extools {
      * @return
      * @throws SQLException 
      */
-    
     private String ResolveSQLStatementIn (String FormFieldDefinition) throws SQLException{
         String[] FieldElements = FormFieldDefinition.split(SplittingColon);
         String Replacement = CurrentIndexScroll.Results.getString(FieldElements[3]);
@@ -257,7 +255,7 @@ public class wdbm implements extools {
         return 0;
     }
     
-    public void FormDisplay(ResultSet LocalResultSet) throws SQLException {
+    public void FormDisplay(ResultSet LocalResultSet) throws SQLException,InterruptedException {
         int iter = 0;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
       //  scrn.clear();
@@ -296,7 +294,7 @@ public class wdbm implements extools {
                 return(FieldValue);
     }
     
-    public void FormEditor() throws SQLException{
+    public void FormEditor() throws SQLException,InterruptedException{
         int iter = 0;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
         for (String LineBuffer : FormTemplate) {
@@ -359,7 +357,7 @@ public class wdbm implements extools {
         screenHandle.setCursorPosition(2, Tsize.getRows() - 2);
     }
     
-    public String PromptForString(String Prompt) throws SQLException {
+    public String PromptForString(String Prompt) throws SQLException,InterruptedException{
         TerminalSize Tsize = rawTerminal.getTerminalSize();
         screenWriter.drawString(0, Tsize.getRows() - 2, BLANK);
         screenWriter.drawString(0, Tsize.getRows() - 2, Prompt);
@@ -377,7 +375,7 @@ public class wdbm implements extools {
      * @return
      * @throws java.sql.SQLException
      */
-    public Key KeyInput(String... Prompt) throws SQLException {
+    public Key KeyInput(String... Prompt) throws SQLException,InterruptedException {
         Key KeyReceived;
         int iter = 0;
         Date thisSec;
@@ -388,17 +386,17 @@ public class wdbm implements extools {
             screenHandle.refresh();
         }
         while ((KeyReceived = screenHandle.readInput()) == null) {
-            try {
+        //    try {
                 Thread.sleep(1);
-            } catch (InterruptedException ex) {
-                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " sleep failed somehow KeyInput");
-            }
+        //    } catch (InterruptedException ex) {
+        //        DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " sleep failed somehow KeyInput");
+        //    }
             if (iter++ == 1000) {
                 thisSec = new Date(); //LocalTime.now();
                 // implementation of display code is left to the reader
                 //display(thisSec.getHour(), thisSec.getMinute(), thisSec.getSecond());
-                TerminalSize Tsize = rawTerminal.getTerminalSize();
-                screenWriter.drawString(Tsize.getColumns()-30, 0, thisSec.toString());
+                // TerminalSize Tsize = rawTerminal.getTerminalSize();
+                screenWriter.drawString(rawTerminal.getTerminalSize().getColumns()-30, 0, thisSec.toString());
                 iter = 0;
                 screenHandle.refresh();
             }else if (iter == 1 || iter == 200 || iter == 400 || iter == 600 || iter == 800 || iter == 1000 ){
@@ -453,7 +451,7 @@ public class wdbm implements extools {
      * @return
      * @throws SQLException
      */
-    public Key ActivateForm(ResultSet LocalResult) throws SQLException {
+    public Key ActivateForm(ResultSet LocalResult) throws SQLException,InterruptedException {
         Key ExitedWithKey;
         do {
             FormDisplay(LocalResult);
@@ -470,7 +468,7 @@ public class wdbm implements extools {
                 } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
                     LocalResult.previous();
                 } else if (ExitedWithKey.getCharacter() == 'e') {
-                    unpackCurrentRecord(LocalResult); //unpackCurrentRecord(StatementResultSet);
+                    unpackCurrentRecord(LocalResult);
                     FormEditor();
                 }
             }
@@ -478,24 +476,46 @@ public class wdbm implements extools {
         return ExitedWithKey;
     }
      
-    public void ActivateWDBM () throws SQLException {
-        try {
+    public void ActivateWDBM () throws SQLException,InterruptedException {
+    //    Thread t = new Thread(new ScrollthenFormLoop());
+    //    t.start();
+        
+    //    while (t.isAlive())t.join(1000);
+        
+        
+        
+      try {
             while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
                 if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
                     return;
                 }
             }
-        } catch (SQLException ex) {
-            DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLstate " + ex.getSQLState());
+        } catch (Exception ex) {
+            // DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
             ex.printStackTrace();
+        } finally {
+            screenHandle.stopScreen();
         }
-        
-     //   int LastIndexScroll = IndexScrolls.size() - 1;
-     //   if (IndexScrolls.get(LastIndexScroll).Results.first()) 
-     //       while (IndexScrolls.get(LastIndexScroll).DisplayList("default").getKind() != Key.Kind.Home
-     //               && IndexScrolls.get(LastIndexScroll).AttachedWDBM.DisplayAndEditRecord(IndjavaexScrolls.get(LastIndexScroll).Results).getKind() != Key.Kind.Home) scrn.clear();
     }
     
+    public class ScrollthenFormLoop implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+
+                while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
+                    if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
+                        return;
+                    }
+                }
+            } catch (Exception ex) {
+                // DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
+                ex.printStackTrace();
+            }
+
+        }
+    }
    
     
 }     
