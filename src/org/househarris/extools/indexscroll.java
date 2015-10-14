@@ -34,7 +34,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+import java.util.Stack;
 
 
 /**
@@ -76,8 +79,9 @@ public class indexscroll implements extools {
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
     
+    private List<String> Substitute = new ArrayList();
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-        List<String> Substitute = new ArrayList();
+        // List<String> Substitute = new ArrayList();
         Substitute.clear();
         for (String FieldName : FieldNameList) {
             Substitute.add(Results.getString(FieldName));
@@ -92,7 +96,7 @@ public class indexscroll implements extools {
     }
            
             
-    public void ReDrawScroll() throws SQLException {
+    public void ReDrawScroll() throws SQLException,InterruptedException {
         TerminalSize Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
         if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
@@ -134,10 +138,22 @@ public class indexscroll implements extools {
      * @param NewSQLQuery
      * @throws SQLException
      */
-    public void ReSearch(String NewSQLQuery) throws SQLException {
-        ResultSet LocalResults;
+    private Thread t ;
+    private Queue SQLQueue = new LinkedList();
+    public void ReSearch(String NewSQLQuery) throws SQLException,InterruptedException{
+        if(t!=null && t.isAlive()) {
+            SQLQueue.clear();
+            SQLQueue.add(NewSQLQuery);
+            return;
+        }
+        SQLQueue.add(NewSQLQuery);
+        
+        t = new Thread(new QuantumExecuteReSearch());
+        t.start();
+        
+    /*    ResultSet LocalResults;
         CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        LocalResults = CurrentCompiledSQLStatement.executeQuery();
+        L/home/harris/Programming/Java/extools/src/org/househarris/extools/wdbm.java:364ocalResults = CurrentCompiledSQLStatement.executeQuery();
         if (LocalResults.first()) {
             Results = LocalResults;
             ScreenCurrentRow = 0;
@@ -146,14 +162,47 @@ public class indexscroll implements extools {
             ReDrawScroll();
             // SQLQueryHistory.add(CurrentSQLQuery);
             CurrentSQLQuery = NewSQLQuery;
+        }*/
+    }
+
+    public class QuantumExecuteReSearch implements Runnable {
+        @Override
+        public void run() {
+            ResultSet LocalResults;
+            try {
+                while (!SQLQueue.isEmpty()) {
+                    String NewSQLQuery = SQLQueue.remove().toString();
+                    CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                    LocalResults = CurrentCompiledSQLStatement.executeQuery();
+                    if (LocalResults.first()) {
+                        Results = LocalResults;
+                        ScreenCurrentRow = 0;
+                        ResultsCurrentRow = Results.getRow();
+                        // AttachedWDBM.scrn.clear();
+                        ReDrawScroll();
+                        // SQLQueryHistory.add(CurrentSQLQuery);
+                        CurrentSQLQuery = NewSQLQuery;
+                        AttachedWDBM.screenHandle.refresh();
+                    }
+                    
+                }
+            } catch (InterruptedException | SQLException | NullPointerException ex) {
+                AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
+                ex.printStackTrace();
+            } finally {
+            }
         }
     }
+ 
+    
+    
+    
     /**
      *
      * @param SQLQuery
      * @throws SQLException
      */
-    public void ExecuteSQLQuery(String SQLQuery) throws SQLException {
+    public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
         ResultSet LocalResults;
         try {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
@@ -180,13 +229,12 @@ public class indexscroll implements extools {
     }
   
  
-    public Key ActivateScroll() throws SQLException {
+    public Key ActivateScroll() throws SQLException,InterruptedException{
         Key KeyReturn;
         TerminalSize Tsize;
+
         ReDrawScroll();
         AttachedWDBM.screenHandle.refresh();
-        
-        
         while (true) {
             Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
             ResultsCurrentRow = Results.getRow();
