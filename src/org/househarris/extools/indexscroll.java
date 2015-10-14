@@ -81,7 +81,6 @@ public class indexscroll implements extools {
     
     private List<String> Substitute = new ArrayList();
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-        // List<String> Substitute = new ArrayList();
         Substitute.clear();
         for (String FieldName : FieldNameList) {
             Substitute.add(Results.getString(FieldName));
@@ -139,14 +138,14 @@ public class indexscroll implements extools {
      * @throws SQLException
      */
     private Thread t ;
-    private Queue SQLQueue = new LinkedList();
+    private volatile Queue SQLQueryQueue = new LinkedList();
     public void ReSearch(String NewSQLQuery) throws SQLException,InterruptedException{
         if(t!=null && t.isAlive()) {
-            SQLQueue.clear();
-            SQLQueue.add(NewSQLQuery);
+            SQLQueryQueue.clear();
+            SQLQueryQueue.add(NewSQLQuery);
             return;
         }
-        SQLQueue.add(NewSQLQuery);
+        SQLQueryQueue.add(NewSQLQuery);
         
         t = new Thread(new QuantumExecuteReSearch());
         t.start();
@@ -170,8 +169,8 @@ public class indexscroll implements extools {
         public void run() {
             ResultSet LocalResults;
             try {
-                while (!SQLQueue.isEmpty()) {
-                    String NewSQLQuery = SQLQueue.remove().toString();
+                while (!SQLQueryQueue.isEmpty()) {
+                    String NewSQLQuery = SQLQueryQueue.remove().toString();
                     CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                     LocalResults = CurrentCompiledSQLStatement.executeQuery();
                     if (LocalResults.first()) {
@@ -190,6 +189,7 @@ public class indexscroll implements extools {
                 AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
                 ex.printStackTrace();
             } finally {
+                
             }
         }
     }
