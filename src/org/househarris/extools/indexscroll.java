@@ -38,6 +38,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Stack;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -64,12 +66,17 @@ public class indexscroll implements extools {
 
     public indexscroll(String ScrollName ,String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException {
         System.err.println("Making New Index Scroll :" + ScrollName);
-        if(Dimensions.length > 0) ListScreenTopLine = Dimensions[0];
+        if(Dimensions.length > 0){
+            ListScreenTopLine = Dimensions[0];
+            ListScreenLength = WDBMAttach.rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
+        }
+        
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
         
         stmt = WDBMAttach.SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         Results = stmt.executeQuery(SQLQuery);
         if (!Results.first()) System.err.println("This returned nothing " + SQLQuery);     //      Empirical kudge ????
+
         ScreenCurrentRow = 0;
         ResultsCurrentRow = Results.getRow();
         AttachedWDBM = WDBMAttach;
@@ -79,17 +86,21 @@ public class indexscroll implements extools {
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
     
-    private List<String> Substitute = new ArrayList();
-    private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList) throws SQLException {
-        Substitute.clear();
+    //private List<String> Substitute = new ArrayList();
+    private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList,ResultSet LocalResult) throws SQLException {
+        List<String> Substitute = new ArrayList();
+   //     int iter = 0;
+   //     Substitute.clear();
         for (String FieldName : FieldNameList) {
-            Substitute.add(Results.getString(FieldName));
+            boolean add = Substitute.add(LocalResult.getString(FieldName));
+//            Substitute.add(Results.getString(FieldName));
         }
+      //  String[] returnArray = Substitute.toArray();
         return Substitute;
     }
 
-    private String ResolveSQLStatements (String Cursor) throws SQLException{
-        String[] FieldElements = Cursor.split(SplittingColon);
+    private String ResolveSQLStatements (String FieldListElement) throws SQLException{
+        String[] FieldElements = FieldListElement.split(SplittingColon);
         String Replacement = Results.getString(FieldElements[3]);
         return String.format(FieldElements[2],Replacement);
     }
@@ -107,7 +118,7 @@ public class indexscroll implements extools {
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
             AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.ScrollingListFormat,
-                    FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()));
+                    FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields,Results).toArray()));
         }
         iter--;
         while (iter++ < ListScreenLength-1) AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, BLANK);
@@ -117,7 +128,7 @@ public class indexscroll implements extools {
 
     public void IlluminateCurrentRow() throws SQLException {
         AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
-                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
+                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields,Results).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
         AttachedWDBM.screenHandle.refresh();
     }
@@ -128,7 +139,7 @@ public class indexscroll implements extools {
      */
     public void DeEmphasiseCurrentRow() throws SQLException {
         AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
-                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields).toArray()),
+                String.format(AttachedWDBM.ScrollingListFormat, FieldNames2ValuesSubstitute(AttachedWDBM.ScrollingListFields,Results).toArray()),
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
     
@@ -137,40 +148,34 @@ public class indexscroll implements extools {
      * @param NewSQLQuery
      * @throws SQLException
      */
-    private Thread t ;
+    private Thread SQLQueryThread ;
     private volatile Queue SQLQueryQueue = new LinkedList();
+    private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
     public void ReSearch(String NewSQLQuery) throws SQLException,InterruptedException{
-        if(t!=null && t.isAlive()) {
+        SQLQueryQueueLock.acquire();
+        if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
             SQLQueryQueue.clear();
             SQLQueryQueue.add(NewSQLQuery);
+            SQLQueryQueueLock.release();
             return;
         }
         SQLQueryQueue.add(NewSQLQuery);
-        
-        t = new Thread(new QuantumExecuteReSearch());
-        t.start();
-        
-    /*    ResultSet LocalResults;
-        CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        L/home/harris/Programming/Java/extools/src/org/househarris/extools/wdbm.java:364ocalResults = CurrentCompiledSQLStatement.executeQuery();
-        if (LocalResults.first()) {
-            Results = LocalResults;
-            ScreenCurrentRow = 0;
-            ResultsCurrentRow = Results.getRow();
-            // AttachedWDBM.scrn.clear();
-            ReDrawScroll();
-            // SQLQueryHistory.add(CurrentSQLQuery);
-            CurrentSQLQuery = NewSQLQuery;
-        }*/
+        SQLQueryQueueLock.release();
+
+        SQLQueryThread = new Thread(new QuantumForkReSearch());
+        SQLQueryThread.start();
+
     }
 
-    public class QuantumExecuteReSearch implements Runnable {
+    public class QuantumForkReSearch implements Runnable {
         @Override
         public void run() {
             ResultSet LocalResults;
             try {
                 while (!SQLQueryQueue.isEmpty()) {
+                    SQLQueryQueueLock.acquire();
                     String NewSQLQuery = SQLQueryQueue.remove().toString();
+                    SQLQueryQueueLock.release();
                     CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                     LocalResults = CurrentCompiledSQLStatement.executeQuery();
                     if (LocalResults.first()) {
@@ -179,11 +184,11 @@ public class indexscroll implements extools {
                         ResultsCurrentRow = Results.getRow();
                         // AttachedWDBM.scrn.clear();
                         ReDrawScroll();
-                        // SQLQueryHistory.add(CurrentSQLQuery);
+                        SQLQueryHistory.add(CurrentSQLQuery);
                         CurrentSQLQuery = NewSQLQuery;
+                        AttachedWDBM.DisplayError("");
                         AttachedWDBM.screenHandle.refresh();
                     }
-                    
                 }
             } catch (InterruptedException | SQLException | NullPointerException ex) {
                 AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
@@ -194,34 +199,18 @@ public class indexscroll implements extools {
         }
     }
  
-    
-    
-    
     /**
      *
      * @param SQLQuery
      * @throws SQLException
      */
     public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
-        ResultSet LocalResults;
+        // ResultSet LocalResults;
         try {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
             String LocalString = AttachedWDBM.PromptForString("->");
-            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
-                CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(LocalString, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                LocalResults = CurrentCompiledSQLStatement.executeQuery();
-                if (LocalResults.first()) {
-                    Results = LocalResults;
-                    ScreenCurrentRow = 0;
-                    ResultsCurrentRow = Results.getRow();
-                    // AttachedWDBM.scrn.clear();
-                    ReDrawScroll();
-                    SQLQueryHistory.add(CurrentSQLQuery);
-                    CurrentSQLQuery = LocalString;
-                    AttachedWDBM.DisplayError("");
-                }
-            }
+            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) ReSearch(LocalString);
         } catch (SQLException ex) {
             AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() +" SQLState "+ex.getSQLState());
             ex.printStackTrace();
@@ -241,7 +230,7 @@ public class indexscroll implements extools {
             IlluminateCurrentRow();
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
             AttachedWDBM.screenHandle.refresh();
-            if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.Home) {
+            if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.ReverseTab) {
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
                 if ((ListScreenLength == 0 || ScreenCurrentRow + 1 < ListScreenLength) && ListScreenTopLine + ScreenCurrentRow + 4 < Tsize.getRows()) {
@@ -261,6 +250,21 @@ public class indexscroll implements extools {
                     Results.previous();
                     ReDrawScroll();
                 }
+            } else if (KeyReturn.getKind() == Key.Kind.PageDown && !Results.isLast()) {
+                Results.relative(5);
+                if(Results.isAfterLast()) Results.last();
+                ReDrawScroll();
+            } else if (KeyReturn.getKind() == Key.Kind.PageUp) {
+                if(Results.getRow()-5 >= 1) Results.relative(-5);
+                else Results.first();
+                ReDrawScroll();
+            } else if (KeyReturn.getKind() == Key.Kind.End) {
+                Results.last();
+                ReDrawScroll();
+            } else if (KeyReturn.getKind() == Key.Kind.Home) {
+                Results.first();
+                ReDrawScroll();
+
             } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
                 if (KeyReturn.getCharacter() == 's') {
                     ExecuteSQLQuery(CurrentSQLQuery);
