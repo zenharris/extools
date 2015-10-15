@@ -420,9 +420,13 @@ public class wdbm implements extools {
                     TerminalSize Tsize = rawTerminal.getTerminalSize();
                     if (CurrentIndexScroll.ScreenCurrentRow < 0) CurrentIndexScroll.ScreenCurrentRow = 0;
                     int LocalMaximum = CurrentIndexScroll.ScreenCurrentRow + CurrentIndexScroll.ListScreenTopLine;
-                    if (LocalMaximum > Tsize.getRows() - 4)
+                    if (LocalMaximum > Tsize.getRows() - 4) {
                         CurrentIndexScroll.ScreenCurrentRow
                                 = Tsize.getRows() - 4 - CurrentIndexScroll.ListScreenTopLine;
+                    }
+
+                    CurrentIndexScroll.ListScreenLength = Tsize.getRows() - CurrentIndexScroll.ListScreenTopLine - 3;
+
                     CurrentIndexScroll.ReDrawScroll();
                     CurrentIndexScroll.IlluminateCurrentRow();
                     FormDisplay(CurrentIndexScroll.Results);
@@ -452,25 +456,31 @@ public class wdbm implements extools {
      * @throws SQLException
      */
     public Key ActivateForm(ResultSet LocalResult) throws SQLException,InterruptedException {
-        Key ExitedWithKey;
+        Key ExitedWithKey = null;
+        
         do {
-            FormDisplay(LocalResult);
-            String ScrollFieldName = FindAnyIndexScrollFields();
-            if (ScrollFieldName != null) {
-                ExitedWithKey = IndexScroll(ScrollFieldName).ActivateScroll();
-                DisplayPrompt(FormMenuPrompt);
-            } else {
-                ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
-            }
-            if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
-                if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
-                    LocalResult.next();
-                } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
-                    LocalResult.previous();
-                } else if (ExitedWithKey.getCharacter() == 'e') {
-                    unpackCurrentRecord(LocalResult);
-                    FormEditor();
+            try {
+                FormDisplay(LocalResult);
+                String ScrollFieldName = FindAnyIndexScrollFields();
+                if (ScrollFieldName != null) {
+                    ExitedWithKey = IndexScroll(ScrollFieldName).ActivateScroll();
+                    DisplayPrompt(FormMenuPrompt);
+                } else {
+                    ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
                 }
+                if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
+                    if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
+                        LocalResult.next();
+                    } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
+                        LocalResult.previous();
+                    } else if (ExitedWithKey.getCharacter() == 'e') {
+                        unpackCurrentRecord(LocalResult);
+                        FormEditor();
+                    }
+                }
+            } catch (SQLException ex) {
+                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
+                ex.printStackTrace();
             }
         } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
         return ExitedWithKey;
@@ -483,20 +493,6 @@ public class wdbm implements extools {
        
        if (Daemonise.length> 0 && !Daemonise[0]) ActivatedWDBM.join();
         
-      //  screenHandle.stopScreen();
-        
-    /*  try {
-            while (CurrentIndexScroll.ActivateScroll().getKind() != Key.Kind.Home) {
-                if (ActivateForm(CurrentIndexScroll.Results).getKind() == Key.Kind.Home) {
-                    return;
-                }
-            }
-        } catch (Exception ex) {
-            // DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
-            ex.printStackTrace();
-        } finally {
-            screenHandle.stopScreen();
-        }*/
     }
     
     public class QuantumExecuteActivateWDBM implements Runnable {
@@ -510,7 +506,7 @@ public class wdbm implements extools {
                     }
                 }
             } catch (Exception ex) {
-                DisplayError(ex.getClass().getName() + ": " + ex.getMessage());
+                System.err.println(ex.getClass().getName() + ": " + ex.getMessage());
                 ex.printStackTrace();
             } finally {
                screenHandle.stopScreen(); 
