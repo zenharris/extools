@@ -100,12 +100,6 @@ public class indexscroll implements extools {
         return Substitute;
     }
 
-    private String ResolveSQLStatements (String FieldListElement) throws SQLException{
-        String[] FieldElements = FieldListElement.split(SplittingColon);
-        String Replacement = Results.getString(FieldElements[3]);
-        return String.format(FieldElements[2],Replacement);
-    }
-           
             
     public void ReDrawScroll() throws SQLException,InterruptedException {
         TerminalSize Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
@@ -151,7 +145,7 @@ public class indexscroll implements extools {
      */
     private Thread SQLQueryThread ;
     private volatile Queue SQLQueryQueue = new LinkedList();
-    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
+//    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
     private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
     public void ReSearch(String NewSQLQuery) throws SQLException,InterruptedException{
         SQLQueryQueueLock.acquire();
@@ -178,11 +172,13 @@ public class indexscroll implements extools {
             try {
                 while (!SQLQueryQueue.isEmpty()) {
                     AttachedWDBM.DisplayStatusLine("Data Transfer Waiting");
+                    AttachedWDBM.screenHandle.refresh();
                     SQLQueryQueueLock.acquire();
                     String NewSQLQuery = SQLQueryQueue.remove().toString();
                     SQLQueryQueueLock.release();
                     if (!NewSQLQuery.equals(CurrentSQLQuery)) {
                         AttachedWDBM.DisplayStatusLine("Data Transfer Taking Place");
+                        AttachedWDBM.screenHandle.refresh();
                         CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                         LocalResults = CurrentCompiledSQLStatement.executeQuery();
                         if (LocalResults.first()) {
@@ -193,11 +189,10 @@ public class indexscroll implements extools {
                             ReDrawScroll();
                             SQLQueryHistory.add(CurrentSQLQuery);
                             CurrentSQLQuery = NewSQLQuery;
-                            AttachedWDBM.DisplayStatusLine("");
-                            AttachedWDBM.screenHandle.refresh();
                         }
                     }
                     AttachedWDBM.DisplayStatusLine("");
+                    AttachedWDBM.screenHandle.refresh();
                 }
             } catch (InterruptedException | SQLException | NullPointerException ex) {
                 AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
@@ -220,6 +215,7 @@ public class indexscroll implements extools {
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
             String LocalString = AttachedWDBM.PromptForString("->");
             if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) ReSearch(LocalString);
+            AttachedWDBM.DisplayError("");
         } catch (SQLException ex) {
             AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() +" SQLState "+ex.getSQLState());
             ex.printStackTrace();
@@ -260,12 +256,13 @@ public class indexscroll implements extools {
                     ReDrawScroll();
                 }
             } else if (KeyReturn.getKind() == Key.Kind.PageDown && !Results.isLast()) {
-                Results.relative(5);
+                Results.relative(ListScreenLength-1);
                 if(Results.isAfterLast()) Results.last();
                 ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.PageUp) {
-                if(Results.getRow()-5 >= 1) Results.relative(-5);
-                else Results.first();
+                if(Results.getRow()-(ListScreenLength-1) >= 1) Results.relative(1-ListScreenLength);
+                else Results.absolute(ScreenCurrentRow+1);
+                // else Results.first();
                 ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.End) {
                 Results.last();
