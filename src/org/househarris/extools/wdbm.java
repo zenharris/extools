@@ -152,7 +152,7 @@ public class wdbm implements extools {
         for (String Field : DefaultFormFieldList) {
             String[] FieldElements = Field.split(SplittingColon);
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementIn(Field), this, MeasureDimensionsOf(FieldElements[0])));
+                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementInFieldTemplate(Field), this, MeasureDimensionsOf(FieldElements[0])));
                 // IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
@@ -215,7 +215,7 @@ public class wdbm implements extools {
      * @return
      * @throws SQLException 
      */
-    private String ResolveSQLStatementIn (String FormFieldDefinition) throws SQLException{
+    private String ResolveSQLStatementInFieldTemplate (String FormFieldDefinition) throws SQLException{
         String[] FieldElements = FormFieldDefinition.split(SplittingColon);
         String Replacement = DefaultScroll.Results.getString(FieldElements[3]);
         return String.format(FieldElements[2],Replacement);
@@ -228,7 +228,7 @@ public class wdbm implements extools {
      * @param ScrollName    text name of scroll
      * @return
      */
-    public indexscroll IndexScroll(String ScrollName) throws SQLException{
+    public indexscroll TheIndexScroll(String ScrollName) throws SQLException{
         for (indexscroll SearchCursor : IndexScrolls) {
             if (SearchCursor.IndexScrollName.equals(ScrollName)) return SearchCursor;
         }
@@ -243,7 +243,7 @@ public class wdbm implements extools {
  * @param FieldTemplate
  * @return 
  */
-    private int ExtractFieldNumberFrom (String FieldTemplate) throws SQLException{
+    private int TheFieldNumberFrom (String FieldTemplate) throws SQLException{
         Pattern p = Pattern.compile(REGEXToMatchNumberEmbededInFieldTemplate);
         Matcher m = p.matcher(FieldTemplate);
         if (m.find()) return Integer.parseInt(FieldTemplate.substring(m.start(), m.end()));
@@ -258,11 +258,11 @@ public class wdbm implements extools {
             Matcher m = p.matcher(LineBuffer);
             while (m.find()) {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
-                String Field = DefaultFormFieldList.get(ExtractFieldNumberFrom(FieldTemplate));
+                String Field = DefaultFormFieldList.get(TheFieldNumberFrom(FieldTemplate));
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
 
-                    IndexScroll(FieldName).ReSearch(ResolveSQLStatementIn(Field));
+                    TheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
                     // IndexScroll(FieldName).ReDrawScroll();
                     LineBuffer = "";
                 } else {
@@ -296,14 +296,14 @@ public class wdbm implements extools {
             Matcher m = p.matcher(LineBuffer);
             while (m.find()) {
                 String FieldTemplate = LineBuffer.substring(m.start(), m.end());
-                String Field = DefaultFormFieldList.get(ExtractFieldNumberFrom(FieldTemplate));
+                String Field = DefaultFormFieldList.get(TheFieldNumberFrom(FieldTemplate));
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     
                   //  Key ExitKey = IndexScroll(FieldName).DisplayList();
 
                 } else {
-                    String FieldValue = CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
+                    String FieldValue = CurrentRecord.get(TheFieldNumberFrom(FieldTemplate));
                     FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
                     TextEditor.LineEditorPosition = 0;
                     TextEditor.LineEditor(m.start(), iter, FieldTemplate.length(), FieldValue);
@@ -465,7 +465,7 @@ public class wdbm implements extools {
                 FormDisplay(LocalResult);
                 String ScrollFieldName = FindFirstScrollInDefaultForm();
                 if (ScrollFieldName != null) {
-                    ExitedWithKey = IndexScroll(ScrollFieldName).ActivateScroll();
+                    ExitedWithKey = TheIndexScroll(ScrollFieldName).ActivateScroll();
                     DisplayPrompt(FormMenuPrompt);
                 } else {
                     ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
