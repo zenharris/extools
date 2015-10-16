@@ -13,7 +13,7 @@ package org.househarris.extools;
 
 public interface extools {
 
-    static final String BLANK = "                                                                                                                                       ";
+    static final String BLANK = "                                                                                                                                                                                                                                                                                      ";
 
     // The following regular expressions find the field templates embeded in the FormTemplate list
     // Field Templates Look Like @1<<<<<<<<<<     @20<<<<<
