@@ -252,6 +252,7 @@ public class wdbm implements extools {
     
     public void FormDisplay(ResultSet LocalResultSet) throws SQLException,InterruptedException {
         int iter = 0;
+        boolean onceScroll = false;
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
       //  scrn.clear();
         for (String LineBuffer : DefaultFormTemplate) {
@@ -261,9 +262,12 @@ public class wdbm implements extools {
                 String Field = DefaultFormFieldList.get(TheFieldNumberFrom(FieldTemplate));
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
-
-                    TheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
-                    // IndexScroll(FieldName).ReDrawScroll();
+                    if (!onceScroll) {
+                        onceScroll = true;
+                        TheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
+                        // IndexScroll(FieldName).ReDrawScroll();
+                        
+                    }
                     LineBuffer = "";
                 } else {
                     String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
@@ -335,7 +339,7 @@ public class wdbm implements extools {
 
     public void DisplayStatusLine(String StatusText) {
         screenWriter.drawString(0, 0, BLANK.substring(0, rawTerminal.getTerminalSize().getColumns()-30));
-        screenWriter.drawString(0, 0, StatusText);
+        screenWriter.drawString(0, 0, StatusText,ScreenCharacterStyle.Underline,ScreenCharacterStyle.Bold);
         screenHandle.refresh();
 
     }
