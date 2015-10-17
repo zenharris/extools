@@ -36,9 +36,14 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Stack;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -138,31 +143,33 @@ public class indexscroll implements extools {
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
     
+      private Thread SQLQueryThread;
+    //private Queue SQLQueryQueue = new LinkedList();
+    private BlockingQueue<String> SQLQueryQueue = new LinkedBlockingQueue<String>();
+//    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
+    private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
+
     /**
      *
      * @param NewSQLQuery
      * @throws SQLException
      */
-    private Thread SQLQueryThread ;
-    private volatile Queue SQLQueryQueue = new LinkedList();
-//    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
-    private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
-    public void ReSearch(String NewSQLQuery) throws SQLException,InterruptedException{
-        SQLQueryQueueLock.acquire();
+    public void ReSearch(String NewSQLQuery) throws SQLException, InterruptedException {
         if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
-            
+            if (SQLQueryQueue.size() > 1) {
+            //    SQLQueryQueueLock.acquire();
+                SQLQueryThread.interrupt();
+            }
+//            SQLQueryThread.join();
             SQLQueryQueue.clear();  //overrun avoidance
             SQLQueryQueue.add(NewSQLQuery);
             SQLQueryQueueLock.release();
-
             return;
         }
-        SQLQueryQueue.add(NewSQLQuery);
+        boolean add = SQLQueryQueue.add(NewSQLQuery);
         SQLQueryQueueLock.release();
-
         SQLQueryThread = new Thread(new QuantumForkReSearch());
         SQLQueryThread.start();
-
     }
 
     public class QuantumForkReSearch implements Runnable {
@@ -170,35 +177,36 @@ public class indexscroll implements extools {
         public void run() {
             ResultSet LocalResults;
             try {
-                while (!SQLQueryQueue.isEmpty()) {
-                    AttachedWDBM.DisplayStatusLine("Data Transfer Waiting");
-                    AttachedWDBM.screenHandle.refresh();
-                    SQLQueryQueueLock.acquire();
-                    String NewSQLQuery = SQLQueryQueue.remove().toString();
-                    SQLQueryQueueLock.release();
-                    if (!NewSQLQuery.equals(CurrentSQLQuery)) {
-                        AttachedWDBM.DisplayStatusLine("Data Transfer Taking Place");
-                        AttachedWDBM.screenHandle.refresh();
-                        CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                        LocalResults = CurrentCompiledSQLStatement.executeQuery();
-                        if (LocalResults.first()) {
-                            Results = LocalResults;
-                            ScreenCurrentRow = 0;
-                            ResultsCurrentRow = Results.getRow();
-                            // AttachedWDBM.scrn.clear();
-                            ReDrawScroll();
-                            SQLQueryHistory.add(CurrentSQLQuery);
-                            CurrentSQLQuery = NewSQLQuery;
+                while (true) {
+                        SQLQueryQueueLock.acquire();
+                        String NewSQLQuery = SQLQueryQueue.take();
+                        SQLQueryQueueLock.release();
+                        if (!NewSQLQuery.equals(CurrentSQLQuery)) {
+                            AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
+                            AttachedWDBM.screenHandle.refresh();
+                            CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                            LocalResults = CurrentCompiledSQLStatement.executeQuery();
+                            if (LocalResults.first()) {
+                                Results = LocalResults;
+                                ScreenCurrentRow = 0;
+                                ResultsCurrentRow = Results.getRow();
+                                // AttachedWDBM.scrn.clear();
+                                ReDrawScroll();
+                                SQLQueryHistory.add(CurrentSQLQuery);
+                                CurrentSQLQuery = NewSQLQuery;
+                            }
                         }
-                    }
-                    AttachedWDBM.DisplayStatusLine("");
-                    AttachedWDBM.screenHandle.refresh();
+                        AttachedWDBM.DisplayStatusLine("");
+//                    AttachedWDBM.screenHandle.refresh();
                 }
-            } catch (InterruptedException | SQLException | NullPointerException ex) {
+            } catch (InterruptedException | NoSuchElementException | SQLException | NullPointerException ex) {
+                // SQLQueryQueue.clear();
                 AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
                 ex.printStackTrace();
-            } finally {
-                
+            } catch (IllegalMonitorStateException ex) {
+               AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen"); 
+            }finally {
+                SQLQueryQueueLock.release();
             }
         }
     }
@@ -214,11 +222,15 @@ public class indexscroll implements extools {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
             String LocalString = AttachedWDBM.PromptForString("->");
-            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) ReSearch(LocalString);
-            AttachedWDBM.DisplayError("");
+            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
+                ReSearch(LocalString);
+            }
         } catch (SQLException ex) {
-            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() +" SQLState "+ex.getSQLState());
+            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLState " + ex.getSQLState());
             ex.printStackTrace();
+        } finally {
+            AttachedWDBM.DisplayError("");
+            AttachedWDBM.screenHandle.refresh();
         }
     }
   
@@ -260,7 +272,7 @@ public class indexscroll implements extools {
                 if(Results.isAfterLast()) Results.last();
                 ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.PageUp) {
-                if(Results.getRow()-(ListScreenLength-1) >= 1) Results.relative(1-ListScreenLength);
+                if(Results.getRow()-(ListScreenLength) > ListScreenLength) Results.relative(1-ListScreenLength);
                 else Results.absolute(ScreenCurrentRow+1);
                 // else Results.first();
                 ReDrawScroll();
