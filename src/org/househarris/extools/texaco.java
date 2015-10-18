@@ -54,7 +54,7 @@ public class texaco implements extools {
     }
     
     private void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
-        AttachedWDBM.screenWriter.drawString(x + LineEditorBuffer.length(), y, " ");
+        AttachedWDBM.TopWindow().DisplayString(x + LineEditorBuffer.length(), y, " ");
     }
     
     /**
@@ -74,9 +74,9 @@ public class texaco implements extools {
 //        else LineEditorBuffer = "";
         if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
         while (true) {
-            AttachedWDBM.screenWriter.drawString(x, y, LineEditorBuffer);
-            AttachedWDBM.screenHandle.setCursorPosition(x + LineEditorPosition, y);
-            AttachedWDBM.screenHandle.refresh();
+            AttachedWDBM.TopWindow().DisplayString(x, y, LineEditorBuffer);
+            AttachedWDBM.TopWindow().screenHandle.setCursorPosition(x + LineEditorPosition, y);
+            AttachedWDBM.TopWindow().screenHandle.refresh();
             LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput();
             if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
                 InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
