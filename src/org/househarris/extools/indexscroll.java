@@ -41,11 +41,11 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Stack;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import org.househarris.extools.wdbm.TerminalWindow;
 
 
 /**
@@ -74,7 +74,7 @@ public class indexscroll implements extools {
         System.err.println("Making New Index Scroll :" + ScrollName);
         if(Dimensions.length > 0){
             ListScreenTopLine = Dimensions[0];
-            ListScreenLength = WDBMAttach.rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
+            ListScreenLength = WDBMAttach.TopWindow().rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
         }
         
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
@@ -92,6 +92,12 @@ public class indexscroll implements extools {
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
     
+    public TerminalWindow TopWindow() {
+        return AttachedWDBM.WindowStack.peek();
+    }
+ 
+    
+    
     //private List<String> Substitute = new ArrayList();
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList,ResultSet LocalResult) throws SQLException {
         List<String> Substitute = new ArrayList();
@@ -107,7 +113,7 @@ public class indexscroll implements extools {
 
             
     public void ReDrawScroll() throws SQLException,InterruptedException {
-        TerminalSize Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
+        TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
         int SaveResultRow = Results.getRow();
         if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
@@ -117,20 +123,20 @@ public class indexscroll implements extools {
         }
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
+            AttachedWDBM.TopWindow().DisplayString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()));
         }
         iter--;
-        while (iter++ < ListScreenLength-1) AttachedWDBM.screenWriter.drawString(0, ListScreenTopLine+iter, BLANK);
+        while (iter++ < ListScreenLength-1) AttachedWDBM.TopWindow().DisplayString(0, ListScreenTopLine+iter, BLANK);
         // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
 
     public void IlluminateCurrentRow() throws SQLException {
-        AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        AttachedWDBM.TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
-        AttachedWDBM.screenHandle.refresh();
+        AttachedWDBM.TopWindow().screenHandle.refresh();
     }
     
     /**
@@ -138,14 +144,14 @@ public class indexscroll implements extools {
      * @throws SQLException
      */
     public void DeEmphasiseCurrentRow() throws SQLException {
-        AttachedWDBM.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        AttachedWDBM.TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
     }
     
-      private Thread SQLQueryThread;
+    public Thread SQLQueryThread;
     //private Queue SQLQueryQueue = new LinkedList();
-    private BlockingQueue<String> SQLQueryQueue = new LinkedBlockingQueue<String>();
+    private final BlockingQueue<String> SQLQueryQueue = new LinkedBlockingQueue();
 //    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
     private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
 
@@ -153,6 +159,7 @@ public class indexscroll implements extools {
      *
      * @param NewSQLQuery
      * @throws SQLException
+     * @throws InterruptedException;
      */
     public void ReSearch(String NewSQLQuery) throws SQLException, InterruptedException {
         if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
@@ -161,7 +168,7 @@ public class indexscroll implements extools {
                 SQLQueryThread.interrupt();
             }
 //            SQLQueryThread.join();
-            SQLQueryQueue.clear();  //overrun avoidance
+            SQLQueryQueue.clear();  //overrun mittigated
             SQLQueryQueue.add(NewSQLQuery);
             SQLQueryQueueLock.release();
             return;
@@ -183,7 +190,7 @@ public class indexscroll implements extools {
                         SQLQueryQueueLock.release();
                         if (!NewSQLQuery.equals(CurrentSQLQuery)) {
                             AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
-                            AttachedWDBM.screenHandle.refresh();
+                            AttachedWDBM.TopWindow().screenHandle.refresh();
                             CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                             LocalResults = CurrentCompiledSQLStatement.executeQuery();
                             if (LocalResults.first()) {
@@ -230,7 +237,8 @@ public class indexscroll implements extools {
             ex.printStackTrace();
         } finally {
             AttachedWDBM.DisplayError("");
-            AttachedWDBM.screenHandle.refresh();
+            AttachedWDBM.DisplayStatusLine("");
+            AttachedWDBM.TopWindow().screenHandle.refresh();
         }
     }
   
@@ -240,14 +248,15 @@ public class indexscroll implements extools {
         TerminalSize Tsize;
 
         ReDrawScroll();
-        AttachedWDBM.screenHandle.refresh();
+        AttachedWDBM.TopWindow().screenHandle.refresh();
         while (true) {
-            Tsize = AttachedWDBM.rawTerminal.getTerminalSize();
+            Tsize = AttachedWDBM.TopWindow().rawTerminal.getTerminalSize();
             ResultsCurrentRow = Results.getRow();
             IlluminateCurrentRow();
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
-            AttachedWDBM.screenHandle.refresh();
+            AttachedWDBM.TopWindow().screenHandle.refresh();
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.ReverseTab) {
+                DeEmphasiseCurrentRow();
                 return KeyReturn;
             } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
                 if ((ListScreenLength == 0 || ScreenCurrentRow + 1 < ListScreenLength) && ListScreenTopLine + ScreenCurrentRow + 4 < Tsize.getRows()) {
