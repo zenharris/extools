@@ -44,6 +44,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 //import java.lang.Object;
 import java.util.Date;
+// import java.util.concurrent.Executor;
 // import java.text.SimpleDateFormat;
 
 
@@ -54,6 +55,8 @@ public class wdbm implements extools {
     public Terminal rawTerminal;
     public Screen screenHandle;
     public ScreenWriter screenWriter = null;
+    public TerminalWindow DefaultWindow;
+    public Stack<TerminalWindow> WindowStack = new Stack();
     public List<String> DefaultFormTemplate = new ArrayList();
     public List<String> DefaultFormFieldList = new ArrayList();
     public List<String> ServerDetails = new ArrayList();
@@ -64,11 +67,12 @@ public class wdbm implements extools {
     public String DefaultScrollSearchSQL;
     public Connection SQLconnection;
     public ResultSet CurrentRecordResultSet;
-   
-    
+
     public List<indexscroll> IndexScrolls = new ArrayList();
     public List<String> ErrorLog = new ArrayList();
     public String CurrentErrorBuffer = "";
+
+    
     
     /**
      *
@@ -76,7 +80,7 @@ public class wdbm implements extools {
     public texaco TextEditor;
 
     public wdbm(String DataDictionaryFilename) throws ClassNotFoundException,SQLException,IOException {
-        rawTerminal = TerminalFacade.createTerminal();
+     /*   rawTerminal = TerminalFacade.createTerminal();
         TerminalSize Tsize = rawTerminal.getTerminalSize();
         Tsize.setColumns(83); // Max 100
         Tsize.setRows(30); //Max 30
@@ -87,6 +91,10 @@ public class wdbm implements extools {
         screenWriter = new ScreenWriter(screenHandle);
         screenWriter.setForegroundColor(Terminal.Color.WHITE);
         screenWriter.setBackgroundColor(Terminal.Color.BLACK);
+     */ 
+
+        WindowStack.push(DefaultWindow = new TerminalWindow("default",0,0,30,83));
+        
         TextEditor = new texaco(this);
   
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
@@ -96,6 +104,10 @@ public class wdbm implements extools {
         CreateDefaultScroll(DefaultFormTemplate.size());
         CreateAnyScrollsInDefaultForm();
        
+    }
+    
+    public TerminalWindow TopWindow() {
+        return WindowStack.peek();
     }
  
     
@@ -228,7 +240,7 @@ public class wdbm implements extools {
      * @param ScrollName    text name of scroll
      * @return
      */
-    public indexscroll TheIndexScroll(String ScrollName) throws SQLException{
+    public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException{
         for (indexscroll SearchCursor : IndexScrolls) {
             if (SearchCursor.IndexScrollName.equals(ScrollName)) return SearchCursor;
         }
@@ -264,7 +276,7 @@ public class wdbm implements extools {
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     if (!onceScroll) {
                         onceScroll = true;
-                        TheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
+                        WithTheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
                         // IndexScroll(FieldName).ReDrawScroll();
                         
                     }
@@ -278,12 +290,14 @@ public class wdbm implements extools {
                     
                 }
             }
-            screenWriter.drawString(0, iter, LineBuffer);
+            // screenWriter.drawString(0, iter, LineBuffer);
+            TopWindow().DisplayString(0, iter, LineBuffer);
             iter++;
         }
-        screenHandle.refresh();
+        TopWindow().screenHandle.refresh();
     }
 
+ 
     private String PadToPrintingLength (String FieldValue, String FieldTemplate){
         FieldValue += BLANK.substring(0,FieldTemplate.length()-FieldValue.length());
         return(FieldValue);
@@ -338,17 +352,18 @@ public class wdbm implements extools {
     }
 
     public void DisplayStatusLine(String StatusText) {
-        screenWriter.drawString(0, 0, BLANK.substring(0, rawTerminal.getTerminalSize().getColumns()-30));
-        screenWriter.drawString(0, 0, StatusText,ScreenCharacterStyle.Underline,ScreenCharacterStyle.Bold);
-        screenHandle.refresh();
-
+        for (TerminalWindow iter : WindowStack) {
+            iter.DisplayString(0, 0, BLANK.substring(0, iter.rawTerminal.getTerminalSize().getColumns() - 30));
+            iter.DisplayString(0, 0, StatusText, ScreenCharacterStyle.Underline, ScreenCharacterStyle.Bold);
+            iter.screenHandle.refresh();
+        }
     }
 
     public void DisplayError(String ErrorText) {
-        TerminalSize Tsize = rawTerminal.getTerminalSize();
-        screenWriter.drawString(0, Tsize.getRows() - 1, BLANK);
-        screenWriter.drawString(0, Tsize.getRows() - 1, ErrorText);
-        screenHandle.refresh();
+        TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+        TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
+        TopWindow().DisplayString(0, Tsize.getRows() - 1, ErrorText);
+        TopWindow().screenHandle.refresh();
         
         if (CurrentErrorBuffer.equals("")) ErrorLog.add(ErrorText);
         CurrentErrorBuffer = ErrorText;
@@ -356,19 +371,19 @@ public class wdbm implements extools {
     }
     
     public void DisplayPrompt(String Prompt) {
-        TerminalSize Tsize = rawTerminal.getTerminalSize();
-        screenWriter.drawString(0, Tsize.getRows() - 3, BLANK);
-        screenWriter.drawString(0, Tsize.getRows() - 3, Prompt);
-        screenWriter.drawString(0, Tsize.getRows() - 2, "?: ");
-        screenHandle.setCursorPosition(2, Tsize.getRows() - 2);
+        TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+        TopWindow().DisplayString(0, Tsize.getRows() - 3, BLANK);
+        TopWindow().DisplayString(0, Tsize.getRows() - 3, Prompt);
+        TopWindow().DisplayString(0, Tsize.getRows() - 2, "?: ");
+        TopWindow().screenHandle.setCursorPosition(2, Tsize.getRows() - 2);
     }
     
     public String PromptForString(String Prompt) throws SQLException,InterruptedException{
-        TerminalSize Tsize = rawTerminal.getTerminalSize();
-        screenWriter.drawString(0, Tsize.getRows() - 2, BLANK);
-        screenWriter.drawString(0, Tsize.getRows() - 2, Prompt);
+        TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+        TopWindow().DisplayString(0, Tsize.getRows() - 2, BLANK);
+        TopWindow().DisplayString(0, Tsize.getRows() - 2, Prompt);
         String LocalString = TextEditor.LineEditor(Prompt.length()+1, Tsize.getRows() - 2, 80);
-        screenWriter.drawString(0, Tsize.getRows() - 2, BLANK);
+        TopWindow().DisplayString(0, Tsize.getRows() - 2, BLANK);
         return LocalString;
     }
 
@@ -389,9 +404,9 @@ public class wdbm implements extools {
 
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0]);
-            screenHandle.refresh();
+            TopWindow().screenHandle.refresh();
         }
-        while ((KeyReceived = screenHandle.readInput()) == null) {
+        while ((KeyReceived = TopWindow().screenHandle.readInput()) == null) {
         //    try {
                 Thread.sleep(1);
         //    } catch (InterruptedException ex) {
@@ -402,28 +417,30 @@ public class wdbm implements extools {
                 // implementation of display code is left to the reader
                 //display(thisSec.getHour(), thisSec.getMinute(), thisSec.getSecond());
                 // TerminalSize Tsize = rawTerminal.getTerminalSize();
-                screenWriter.drawString(rawTerminal.getTerminalSize().getColumns()-30, 0, thisSec.toString());
+                for (TerminalWindow Witer : WindowStack) {
+                    Witer.DisplayString(Witer.rawTerminal.getTerminalSize().getColumns() - 30, 0, thisSec.toString());
+                    Witer.screenHandle.refresh();
+                }
                 iter = 0;
-                screenHandle.refresh();
             }else if (iter == 1 || iter == 200 || iter == 400 || iter == 600 || iter == 800 || iter == 1000 ){
       
                 if (CurrentErrorBuffer.length() > 0) {
-                    TerminalSize Tsize = rawTerminal.getTerminalSize();
-                    screenWriter.drawString(0, Tsize.getRows() - 1, BLANK);
-                    screenWriter.drawString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
-                    screenHandle.refresh();
+                    TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+                    TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
+                    TopWindow().DisplayString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
+                    TopWindow().screenHandle.refresh();
                     if (FromCharacter + Tsize.getColumns() > CurrentErrorBuffer.length()+5) {
                         FromCharacter = 0;
                     }
-                    screenHandle.refresh();
+                    TopWindow().screenHandle.refresh();
                 }
 
             }
    
-            if (screenHandle.resizePending()) {
+            if (TopWindow().screenHandle.resizePending()) {
                 if (Prompt.length > 0) {
-                    screenHandle.clear();
-                    TerminalSize Tsize = rawTerminal.getTerminalSize();
+                    TopWindow().screenHandle.clear();
+                    TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
                     if (DefaultScroll.ScreenCurrentRow < 0) DefaultScroll.ScreenCurrentRow = 0;
                     int LocalMaximum = DefaultScroll.ScreenCurrentRow + DefaultScroll.ListScreenTopLine;
                     if (LocalMaximum > Tsize.getRows() - 4) {
@@ -439,14 +456,14 @@ public class wdbm implements extools {
                     DisplayPrompt(Prompt[0]);
                     DisplayStatusLine(String.format("Term Dimensions %3s col x %-3srow", Tsize.getColumns(), Tsize.getRows()));
                 }
-                screenHandle.refresh();
+                TopWindow().screenHandle.refresh();
             }
         }
         return KeyReceived;
     }
 
     
-    public String FindFirstScrollInDefaultForm() {
+    public String FirstScrollInDefaultForm() {
         for (String SearchCursor : DefaultFormFieldList) {
             if (SearchCursor.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                 return SearchCursor.split(SplittingColon)[0];
@@ -460,16 +477,18 @@ public class wdbm implements extools {
      * @param LocalResult
      * @return
      * @throws SQLException
+     * @throws InterruptedException;
      */
     public Key ActivateForm(ResultSet LocalResult) throws SQLException,InterruptedException {
         Key ExitedWithKey = null;
-        
+        WindowStack.push(new TerminalWindow(FirstScrollInDefaultForm(),0,0,DefaultFormTemplate.size()+3,83));
         do {
             try {
                 FormDisplay(LocalResult);
-                String ScrollFieldName = FindFirstScrollInDefaultForm();
+                String ScrollFieldName = FirstScrollInDefaultForm();
                 if (ScrollFieldName != null) {
-                    ExitedWithKey = TheIndexScroll(ScrollFieldName).ActivateScroll();
+                    ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
+                    if (ExitedWithKey.getKind() == Key.Kind.Enter) ActivateForm(WithTheIndexScroll(ScrollFieldName).Results);
                     DisplayPrompt(FormMenuPrompt);
                 } else {
                     ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
@@ -488,12 +507,14 @@ public class wdbm implements extools {
                 DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
                 ex.printStackTrace();
             }
-        } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.Home);
+        } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.ReverseTab);
+        WindowStack.pop().screenHandle.stopScreen();
         return ExitedWithKey;
     }
      
     private Thread ActivatedWDBM;
     public void ActivateWDBM (boolean... Daemonise) throws SQLException,InterruptedException {
+        
        ActivatedWDBM = new Thread(new QuantumForkActivateWDBM());
        ActivatedWDBM.start();
        
@@ -505,9 +526,10 @@ public class wdbm implements extools {
 
         @Override
         public void run() {
+            boolean onceInterrupt = false;
             try {
-                while (DefaultScroll.ActivateScroll().getKind() != Key.Kind.Home) {
-                    if (ActivateForm(DefaultScroll.Results).getKind() == Key.Kind.Home) {
+                while (DefaultScroll.ActivateScroll().getKind() != Key.Kind.ReverseTab) {
+                    if (ActivateForm(DefaultScroll.Results).getKind() == Key.Kind.ReverseTab) {
                         return; //throw new SQLException("Exiting Exception ");
                     }
                 }
@@ -515,10 +537,56 @@ public class wdbm implements extools {
                 System.err.println(ex.getClass().getName() + ": " + ex.getMessage());
                 ex.printStackTrace();
             } finally {
-               screenHandle.stopScreen(); 
+                
+                for (indexscroll iter : IndexScrolls) {
+                    if (!onceInterrupt) onceInterrupt = true;
+                    else iter.SQLQueryThread.interrupt();
+                }
+                DefaultWindow.screenHandle.stopScreen();
+                IndexScrolls.get(0).SQLQueryThread.interrupt();
+
             }
         }
     }
    
+    public class TerminalWindow {
+        public String Name;
+        public Terminal rawTerminal;
+        public Screen screenHandle;
+        public ScreenWriter screenWriter = null;
+        public int Column = 0;
+        public int Row = 0;
+        public int Length = 0;
+        public int Width = 0;
+
+        public TerminalWindow(String name,int column,int row,int length,int width,wdbm... CloneFrom) {
+            Name = name;
+            if (CloneFrom.length > 0) {
+                rawTerminal = CloneFrom[0].TopWindow().rawTerminal;
+                screenHandle = CloneFrom[0].TopWindow().screenHandle;
+                screenWriter = CloneFrom[0].TopWindow().screenWriter;
+            } else {
+                rawTerminal = TerminalFacade.createTerminal();
+                TerminalSize Tsize = rawTerminal.getTerminalSize();
+                Tsize.setColumns(Width=width); // Max 100
+                Tsize.setRows(Length=length); //Max 30
+                Column = column;
+                Row = row;
+                screenHandle = TerminalFacade.createScreen(rawTerminal);
+                screenHandle.startScreen();
+                screenHandle.clear();
+                screenHandle.refresh();
+                screenWriter = new ScreenWriter(screenHandle);
+                screenWriter.setForegroundColor(Terminal.Color.WHITE);
+                screenWriter.setBackgroundColor(Terminal.Color.BLACK);
+            }
+        }
+
+        
+        public void DisplayString(int col,int row,String LineBuffer, ScreenCharacterStyle... styles) {
+            screenWriter.drawString(col, row, LineBuffer,styles);
+        }
+
+    }
     
 }     
