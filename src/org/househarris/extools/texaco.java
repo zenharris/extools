@@ -61,8 +61,8 @@ public class texaco implements extools {
      *
      * Inputs text with line editing features
      * 
-     * @param x Screen Row
-     * @param y
+     * @param x Screen Col
+     * @param y Screen Rows
      * @param LengthLimit
      * @param InitialValue
      * @return
