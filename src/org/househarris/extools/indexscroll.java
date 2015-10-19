@@ -113,7 +113,7 @@ public class indexscroll implements extools {
 
             
     public void ReDrawScroll() throws SQLException,InterruptedException {
-        TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+        TerminalSize Tsize = TopWindow().TerminalSize();
         int SaveResultRow = Results.getRow();
         if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
@@ -123,20 +123,20 @@ public class indexscroll implements extools {
         }
         int iter;
         for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            AttachedWDBM.TopWindow().DisplayString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
+            TopWindow().DisplayString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
                     FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()));
         }
         iter--;
-        while (iter++ < ListScreenLength-1) AttachedWDBM.TopWindow().DisplayString(0, ListScreenTopLine+iter, BLANK);
+        while (iter++ < ListScreenLength-1) TopWindow().DisplayString(0, ListScreenTopLine+iter, BLANK);
         // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         Results.absolute(SaveResultRow);
     }
 
     public void IlluminateCurrentRow() throws SQLException {
-        AttachedWDBM.TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
                 Terminal.Color.BLACK, Terminal.Color.WHITE);
-        AttachedWDBM.TopWindow().screenHandle.refresh();
+        TopWindow().Refresh();
     }
     
     /**
@@ -144,9 +144,10 @@ public class indexscroll implements extools {
      * @throws SQLException
      */
     public void DeEmphasiseCurrentRow() throws SQLException {
-        AttachedWDBM.TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
                 String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
                 Terminal.Color.WHITE, Terminal.Color.BLACK);
+        TopWindow().Refresh();
     }
     
     public Thread SQLQueryThread;
@@ -190,7 +191,7 @@ public class indexscroll implements extools {
                         SQLQueryQueueLock.release();
                         if (!NewSQLQuery.equals(CurrentSQLQuery)) {
                             AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
-                            AttachedWDBM.TopWindow().screenHandle.refresh();
+                            TopWindow().Refresh();
                             CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                             LocalResults = CurrentCompiledSQLStatement.executeQuery();
                             if (LocalResults.first()) {
@@ -238,7 +239,7 @@ public class indexscroll implements extools {
         } finally {
             AttachedWDBM.DisplayError("");
             AttachedWDBM.DisplayStatusLine("");
-            AttachedWDBM.TopWindow().screenHandle.refresh();
+            TopWindow().Refresh();
         }
     }
   
@@ -248,13 +249,13 @@ public class indexscroll implements extools {
         TerminalSize Tsize;
 
         ReDrawScroll();
-        AttachedWDBM.TopWindow().screenHandle.refresh();
+        TopWindow().Refresh();
         while (true) {
-            Tsize = AttachedWDBM.TopWindow().rawTerminal.getTerminalSize();
+            Tsize = AttachedWDBM.TopWindow().TerminalSize();
             ResultsCurrentRow = Results.getRow();
             IlluminateCurrentRow();
             if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
-            AttachedWDBM.TopWindow().screenHandle.refresh();
+            TopWindow().Refresh();
             if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.ReverseTab) {
                 DeEmphasiseCurrentRow();
                 return KeyReturn;
