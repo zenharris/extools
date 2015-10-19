@@ -35,6 +35,7 @@ import com.googlecode.lanterna.terminal.*;
 import com.googlecode.lanterna.screen.*;
 import com.googlecode.lanterna.input.*;
 import com.googlecode.lanterna.TerminalFacade;
+import com.googlecode.lanterna.terminal.swing.SwingTerminal;
 import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -94,9 +95,7 @@ public class wdbm implements extools {
      */ 
 
         WindowStack.push(DefaultWindow = new TerminalWindow("default",0,0,30,83));
-        
         TextEditor = new texaco(this);
-  
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
         OpenSQLfile();
         
@@ -197,7 +196,6 @@ public class wdbm implements extools {
         //      int number;
         int LineCounter = 0;
         boolean firstTime = true;
-
         String SearchRegex = String.format("@%s<+", GetFieldNumber(FieldName));
         Pattern p = Pattern.compile(SearchRegex);
         for (String LocalBuffer : DefaultFormTemplate) {
@@ -294,7 +292,7 @@ public class wdbm implements extools {
             TopWindow().DisplayString(0, iter, LineBuffer);
             iter++;
         }
-        TopWindow().screenHandle.refresh();
+        TopWindow().Refresh();
     }
 
  
@@ -355,7 +353,7 @@ public class wdbm implements extools {
         for (TerminalWindow iter : WindowStack) {
             iter.DisplayString(0, 0, BLANK.substring(0, iter.rawTerminal.getTerminalSize().getColumns() - 30));
             iter.DisplayString(0, 0, StatusText, ScreenCharacterStyle.Underline, ScreenCharacterStyle.Bold);
-            iter.screenHandle.refresh();
+            iter.Refresh();
         }
     }
 
@@ -363,7 +361,7 @@ public class wdbm implements extools {
         TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
         TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
         TopWindow().DisplayString(0, Tsize.getRows() - 1, ErrorText);
-        TopWindow().screenHandle.refresh();
+        TopWindow().Refresh();
         
         if (CurrentErrorBuffer.equals("")) ErrorLog.add(ErrorText);
         CurrentErrorBuffer = ErrorText;
@@ -375,7 +373,7 @@ public class wdbm implements extools {
         TopWindow().DisplayString(0, Tsize.getRows() - 3, BLANK);
         TopWindow().DisplayString(0, Tsize.getRows() - 3, Prompt);
         TopWindow().DisplayString(0, Tsize.getRows() - 2, "?: ");
-        TopWindow().screenHandle.setCursorPosition(2, Tsize.getRows() - 2);
+        TopWindow().CursorTo(2, Tsize.getRows() - 2);
     }
     
     public String PromptForString(String Prompt) throws SQLException,InterruptedException{
@@ -404,9 +402,9 @@ public class wdbm implements extools {
 
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0]);
-            TopWindow().screenHandle.refresh();
+            TopWindow().Refresh();
         }
-        while ((KeyReceived = TopWindow().screenHandle.readInput()) == null) {
+        while ((KeyReceived = TopWindow().GetKey()) == null) {
         //    try {
                 Thread.sleep(1);
         //    } catch (InterruptedException ex) {
@@ -419,7 +417,7 @@ public class wdbm implements extools {
                 // TerminalSize Tsize = rawTerminal.getTerminalSize();
                 for (TerminalWindow Witer : WindowStack) {
                     Witer.DisplayString(Witer.rawTerminal.getTerminalSize().getColumns() - 30, 0, thisSec.toString());
-                    Witer.screenHandle.refresh();
+                    Witer.Refresh();
                 }
                 iter = 0;
             }else if (iter == 1 || iter == 200 || iter == 400 || iter == 600 || iter == 800 || iter == 1000 ){
@@ -428,18 +426,18 @@ public class wdbm implements extools {
                     TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
                     TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
                     TopWindow().DisplayString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
-                    TopWindow().screenHandle.refresh();
+                    TopWindow().Refresh();
                     if (FromCharacter + Tsize.getColumns() > CurrentErrorBuffer.length()+5) {
                         FromCharacter = 0;
                     }
-                    TopWindow().screenHandle.refresh();
+                    TopWindow().Refresh();
                 }
 
             }
    
             if (TopWindow().screenHandle.resizePending()) {
                 if (Prompt.length > 0) {
-                    TopWindow().screenHandle.clear();
+                    TopWindow().Clear();
                     TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
                     if (DefaultScroll.ScreenCurrentRow < 0) DefaultScroll.ScreenCurrentRow = 0;
                     int LocalMaximum = DefaultScroll.ScreenCurrentRow + DefaultScroll.ListScreenTopLine;
@@ -456,7 +454,7 @@ public class wdbm implements extools {
                     DisplayPrompt(Prompt[0]);
                     DisplayStatusLine(String.format("Term Dimensions %3s col x %-3srow", Tsize.getColumns(), Tsize.getRows()));
                 }
-                TopWindow().screenHandle.refresh();
+                TopWindow().Refresh();
             }
         }
         return KeyReceived;
@@ -587,6 +585,30 @@ public class wdbm implements extools {
             screenWriter.drawString(col, row, LineBuffer,styles);
         }
 
+        public void CursorTo(int col,int row){
+            screenHandle.setCursorPosition(col, row);
+        }
+
+        public void Refresh () {
+            screenHandle.refresh();
+        }
+        
+        public void Clear() {
+            screenHandle.clear();
+        }
+        
+        public Key GetKey () {
+            return screenHandle.readInput();
+        }
+        
+        public TerminalSize TerminalSize() {
+            return rawTerminal.getTerminalSize();
+        }
+      
+        public TerminalWindow TopWindow() {
+            return WindowStack.peek();
+        }
+  
     }
     
 }     
