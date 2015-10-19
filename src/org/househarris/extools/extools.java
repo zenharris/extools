@@ -5,6 +5,9 @@
  */
 package org.househarris.extools;
 
+import java.util.Stack;
+import org.househarris.extools.wdbm.TerminalWindow;
+
 /**
  *
  * @author Zen Harris
@@ -35,4 +38,12 @@ public interface extools {
  //   }
  //  public Key KeyInput(String... test);
  // public wdbm wdbm(String test);
+    
+    /**
+     *Stack containing Terminal Window definitions
+     */
+    //public Stack<TerminalWindow> WindowStack = new Stack();
+    
+    //public TerminalWindow TopWindow();
+    
 }
