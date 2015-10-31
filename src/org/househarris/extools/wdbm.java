@@ -334,10 +334,10 @@ public class wdbm implements extools {
                 String FieldName = Field.split(SplittingColon)[0];
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     if (!onceScroll) {
-                        onceScroll = true;
-                        searchAtom temp = WithTheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
-                        WithTheIndexScroll(FieldName).Results = temp.AtomicResultSet;
-                        WithTheIndexScroll(FieldName).SearchAtomStack.push(temp);
+                    //    onceScroll = true;
+                    //    searchAtom temp = WithTheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
+                    //    WithTheIndexScroll(FieldName).Results = temp.AtomicResultSet;
+                    //    WithTheIndexScroll(FieldName).SearchAtomStack.push(temp);
                         WithTheIndexScroll(FieldName).ReDrawScroll();
                        
 // IndexScroll(FieldName).ReDrawScroll();
@@ -592,12 +592,18 @@ public class wdbm implements extools {
                     FormDisplay(LocalResult, AttachedWindow);
                     AttachedWindow.Refresh();
                     String ScrollFieldName = FirstScrollInDefaultForm();
-WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(WithTheIndexScroll(ScrollFieldName).ReSearch(ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName))), AttachedWindow));
                     if (ScrollFieldName != null) {
-                        ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
+/// WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(WithTheIndexScroll(ScrollFieldName).ReSearch(ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName))), AttachedWindow));
+                        String PushSql = ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName)));
+                        searchAtom push;
+                        push = DefaultScroll.returnNewSearchAtom(PushSql, AttachedWindow, SQLconnection);
+                        
+                        
+                         WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(push);
+                       ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
                         if (ExitedWithKey.getKind() == Key.Kind.Enter) {
                             //Syncronise 
-                            ActivateForm(WithTheIndexScroll(ScrollFieldName).CurrentSearchAtom.AtomicResultSet,RecordBuffer);
+                            ActivateForm(WithTheIndexScroll(ScrollFieldName).SearchAtomStack.peek().AtomicResultSet);
                         }
                         DisplayPrompt(FormMenuPrompt);
                     } else {
