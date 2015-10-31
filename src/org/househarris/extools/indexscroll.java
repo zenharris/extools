@@ -150,7 +150,7 @@ public class indexscroll implements extools {
    //     int iter = 0;
    //     Substitute.clear();
         for (String FieldName : FieldNameList) {
-            boolean add = Substitute.add(SearchAtomStack.peek().AtomicResultSet.getString(FieldName));
+            boolean add = Substitute.add(LocalResult.getString(FieldName));
 //            Substitute.add(Results.getString(FieldName));
         }
       //  String[] returnArray = Substitute.toArray();
@@ -232,7 +232,7 @@ public class indexscroll implements extools {
           ////  if (ApropriateWindow().ThreadPool)
            // ApropriateWindow().ThreadPool.add(SQLQueryThread.getId());
             SQLQueryQueueLock.release();
-            return SearchAtom;
+            return CurrentSearchAtom = SearchAtom;
         }
             SearchAtomStack.peek().AtomicSQL = NewSQLQuery;
         boolean add = SQLQueryQueue.add(SearchAtom = SearchAtomStack.peek()); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
@@ -241,9 +241,13 @@ public class indexscroll implements extools {
         UseWindow.ThreadPool.add(SQLQueryThread.getId());
         
         SQLQueryThread.start();
-        return SearchAtom;
+        return CurrentSearchAtom = SearchAtom;
     }
 
+    public searchAtom returnNewSearchAtom(String SQLStatement,TerminalWindow Terminal,Connection SQLMainPipe) throws SQLException {
+        return new searchAtom(SQLStatement, Terminal, SQLMainPipe);
+        
+    }
     public class searchAtom{
         Connection AtomicSQLMainPipe;
         String AtomicSQL;
@@ -252,13 +256,14 @@ public class indexscroll implements extools {
         Statement AtomicStatement;
         PreparedStatement AtomicCompiledStatement;
         
-        searchAtom (String SQLStatement,TerminalWindow Terminal,Connection SQLMainPipe) throws SQLException {
+        public searchAtom (String SQLStatement,TerminalWindow Terminal,Connection SQLMainPipe) throws SQLException {
             AtomicSQLMainPipe = SQLMainPipe;
             AtomicSQL = SQLStatement;
             AtomicOutTerminal = Terminal;
           //  AtomicResultSet = Results;
             AtomicCompiledStatement = SQLMainPipe.prepareStatement(SQLStatement, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             AtomicResultSet = AtomicCompiledStatement.executeQuery();
+            AtomicResultSet.first();
         }
     }
     
@@ -355,7 +360,7 @@ public class indexscroll implements extools {
         
         
         // ReDrawScroll(CurrentSearchAtom);
-        ReDrawScroll(SearchAtomStack.peek());
+        ReDrawScroll();
         
         while (true) {
             UseWindow.Refresh();
@@ -375,7 +380,7 @@ public class indexscroll implements extools {
                     SearchAtomStack.peek().AtomicResultSet.next();
                 } else {
                     SearchAtomStack.peek().AtomicResultSet.next();
-                    ReDrawScroll(SearchAtomStack.peek());
+                    ReDrawScroll();
                 }
             } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !SearchAtomStack.peek().AtomicResultSet.isFirst()) {
                 if (ScreenCurrentRow > 0) {
@@ -384,23 +389,23 @@ public class indexscroll implements extools {
                     SearchAtomStack.peek().AtomicResultSet.previous();
                 } else {
                     SearchAtomStack.peek().AtomicResultSet.previous();
-                    ReDrawScroll(SearchAtomStack.peek());
+                    ReDrawScroll();
                 }
             } else if (KeyReturn.getKind() == Key.Kind.PageDown && !SearchAtomStack.peek().AtomicResultSet.isLast()) {
                 SearchAtomStack.peek().AtomicResultSet.relative(ListScreenLength-1);
                 if(SearchAtomStack.peek().AtomicResultSet.isAfterLast()) SearchAtomStack.peek().AtomicResultSet.last();
-                ReDrawScroll(SearchAtomStack.peek());
+                ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.PageUp) {
                 if(SearchAtomStack.peek().AtomicResultSet.getRow()-(ListScreenLength) > ListScreenLength) SearchAtomStack.peek().AtomicResultSet.relative(1-ListScreenLength);
                 else SearchAtomStack.peek().AtomicResultSet.absolute(ScreenCurrentRow+1);
                 // else Results.first();
-                ReDrawScroll(SearchAtomStack.peek());
+                ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.End) {
                 SearchAtomStack.peek().AtomicResultSet.last();
-                ReDrawScroll(SearchAtomStack.peek());
+                ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.Home) {
                 SearchAtomStack.peek().AtomicResultSet.first();
-                ReDrawScroll(SearchAtomStack.peek());
+                ReDrawScroll();
             } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
                 if (KeyReturn.getCharacter() == 's') {
                     ExecuteSQLQuery(CurrentSQLQuery,UseWindow);
