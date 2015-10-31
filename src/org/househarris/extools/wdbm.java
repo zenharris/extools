@@ -45,6 +45,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 //import java.lang.Object;
 import java.util.Date;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import org.househarris.extools.indexscroll.searchAtom;
 // import java.util.concurrent.Executor;
 // import java.text.SimpleDateFormat;
 
@@ -70,6 +73,8 @@ public class wdbm implements extools {
     public ResultSet CurrentRecordResultSet;
 
     public List<indexscroll> IndexScrolls = new ArrayList();
+    public List<Thread> ActivatedFormsThreadPool = new ArrayList();
+  
     public List<String> ErrorLog = new ArrayList();
     public String CurrentErrorBuffer = "";
 
@@ -94,7 +99,7 @@ public class wdbm implements extools {
         screenWriter.setBackgroundColor(Terminal.Color.BLACK);
      */ 
 
-        WindowStack.push(DefaultWindow = new TerminalWindow("default",0,0,30,83));
+        WindowStack.push(DefaultWindow = new TerminalWindow(0,0,30,83));
         TextEditor = new texaco(this);
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
         OpenSQLfile();
@@ -105,10 +110,47 @@ public class wdbm implements extools {
        
     }
     
-    public TerminalWindow TopWindow() {
-        return WindowStack.peek();
+ //   public TerminalWindow TopWindow() {
+ //       return NamedWindow(Thread.currentThread().getId());
+       // return WindowStack.peek();
+ //////   }
+    
+    /*
+   public TerminalWindow NamedWindow(long searchfor) {
+        for (TerminalWindow SearchPointer : WindowStack) {
+            if (SearchPointer.ThreadId == searchfor) return SearchPointer;
+        }
+        return null; // WindowStack.peek();
     }
- 
+   */
+         public TerminalWindow TopWindow() throws SQLException {
+             return ApropriateWindow();
+            // return NamedWindow(Thread.currentThread().getId());
+            // return WindowStack.peek();
+        }
+        
+        public TerminalWindow ApropriateWindow(long... OverrideThread) throws SQLException {
+            long searcher;
+            if (OverrideThread.length > 0) searcher = OverrideThread[0];
+            else searcher = Thread.currentThread().getId();
+            for (TerminalWindow searchWindow : WindowStack ) {
+                for (long iter : searchWindow.ThreadPool) {
+                    if (iter == searcher) return searchWindow ;
+                }
+            }
+            throw new SQLException("Could Not find Apropriate window");
+        }
+        public TerminalWindow NamedWindow(long searchfor) throws SQLException {
+            for (TerminalWindow searchWindow : WindowStack) {
+                for (long iter : searchWindow.ThreadPool) {
+                    if (iter == searchfor) return searchWindow;
+                }
+                
+            } 
+            throw new SQLException("Could Not find Named window ->"+searchfor);
+        }
+    
+    
     
     private void OpenSQLfile() throws ClassNotFoundException,SQLException {
             Class.forName("org.postgresql.Driver");
@@ -260,9 +302,28 @@ public class wdbm implements extools {
         throw new SQLException("No Numeric in FieldTemplate"+FieldTemplate+" .zen");
     }
     
-    public void FormDisplay(ResultSet LocalResultSet) throws SQLException,InterruptedException {
+    private List<String> unpackRecordBuffer(ResultSet ResultsSetToUnpack) throws SQLException {
+        String FieldValue;
+        List<String> WorkList = new ArrayList();
+        //CurrentRecord.clear();
+        for (String FieldName : DefaultFormFieldList) {
+            if (FieldName.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
+                ////  Ignore index scroll fields, they are not real.
+            } else {
+                FieldValue = ResultsSetToUnpack.getString(FieldName.split(SplittingColon)[0]);
+                if (FieldValue == null) FieldValue = "";              // Strange Processing for when feilds have a null value
+                WorkList.add(FieldValue);
+            }
+        }
+        return WorkList;
+    }
+    
+    
+    public void FormDisplay(ResultSet LocalResultSet,TerminalWindow... AttachedWindow) throws SQLException,InterruptedException {
         int iter = 0;
         boolean onceScroll = false;
+        List<String> RecordBuffer = new ArrayList();
+        RecordBuffer = unpackRecordBuffer(LocalResultSet);
         Pattern p = Pattern.compile(REGEXToMatchEmbededFieldTemplate);
       //  scrn.clear();
         for (String LineBuffer : DefaultFormTemplate) {
@@ -274,14 +335,19 @@ public class wdbm implements extools {
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     if (!onceScroll) {
                         onceScroll = true;
-                        WithTheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
-                        // IndexScroll(FieldName).ReDrawScroll();
+                        searchAtom temp = WithTheIndexScroll(FieldName).ReSearch(ResolveSQLStatementInFieldTemplate(Field));
+                        WithTheIndexScroll(FieldName).Results = temp.AtomicResultSet;
+                        WithTheIndexScroll(FieldName).SearchAtomStack.push(temp);
+                        WithTheIndexScroll(FieldName).ReDrawScroll();
+                       
+// IndexScroll(FieldName).ReDrawScroll();
                         
                     }
                     LineBuffer = "";
                 } else {
-                    String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
-                    if (FieldValue == null)  FieldValue = "";
+                 //   String FieldValue = LocalResultSet.getString(FieldName);// CurrentRecord.get(ExtractFieldNumberFrom(FieldTemplate));
+                     String FieldValue = RecordBuffer.get(TheFieldNumberFrom(FieldTemplate));
+                   if (FieldValue == null)  FieldValue = "";
                     FieldValue = TrimToEditingLength(FieldValue, FieldTemplate);
                     FieldValue = PadToPrintingLength(FieldValue, FieldTemplate);
                     LineBuffer = LineBuffer.replaceFirst(REGEXToMatchEmbededFieldTemplate, FieldValue);
@@ -289,10 +355,14 @@ public class wdbm implements extools {
                 }
             }
             // screenWriter.drawString(0, iter, LineBuffer);
-            TopWindow().DisplayString(0, iter, LineBuffer);
+            if(AttachedWindow.length>0){
+                AttachedWindow[0].DisplayString(0, iter, LineBuffer);
+            }
+            else ApropriateWindow().DisplayString(0, iter, LineBuffer);
             iter++;
         }
-        TopWindow().Refresh();
+        if(AttachedWindow.length>0)AttachedWindow[0].Refresh();
+        else ApropriateWindow().Refresh();
     }
 
  
@@ -357,7 +427,7 @@ public class wdbm implements extools {
         }
     }
 
-    public void DisplayError(String ErrorText) {
+    public void DisplayError(String ErrorText) throws SQLException {
         TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
         TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
         TopWindow().DisplayString(0, Tsize.getRows() - 1, ErrorText);
@@ -368,7 +438,7 @@ public class wdbm implements extools {
         
     }
     
-    public void DisplayPrompt(String Prompt) {
+    public void DisplayPrompt(String Prompt) throws SQLException {
         TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
         TopWindow().DisplayString(0, Tsize.getRows() - 3, BLANK);
         TopWindow().DisplayString(0, Tsize.getRows() - 3, Prompt);
@@ -424,21 +494,21 @@ public class wdbm implements extools {
       
                 if (CurrentErrorBuffer.length() > 0) {
                     TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
-                    TopWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
-                    TopWindow().DisplayString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
-                    TopWindow().Refresh();
+                    ApropriateWindow().DisplayString(0, Tsize.getRows() - 1, BLANK);
+                    ApropriateWindow().DisplayString(0, Tsize.getRows() - 1, CurrentErrorBuffer.substring(FromCharacter++));
+                    ApropriateWindow().Refresh();
                     if (FromCharacter + Tsize.getColumns() > CurrentErrorBuffer.length()+5) {
                         FromCharacter = 0;
                     }
-                    TopWindow().Refresh();
+                    ApropriateWindow().Refresh();
                 }
 
             }
    
-            if (TopWindow().screenHandle.resizePending()) {
+            if (ApropriateWindow().screenHandle.resizePending()) {
                 if (Prompt.length > 0) {
-                    TopWindow().Clear();
-                    TerminalSize Tsize = TopWindow().rawTerminal.getTerminalSize();
+                    ApropriateWindow().Clear();
+                    TerminalSize Tsize = ApropriateWindow().rawTerminal.getTerminalSize();
                     if (DefaultScroll.ScreenCurrentRow < 0) DefaultScroll.ScreenCurrentRow = 0;
                     int LocalMaximum = DefaultScroll.ScreenCurrentRow + DefaultScroll.ListScreenTopLine;
                     if (LocalMaximum > Tsize.getRows() - 4) {
@@ -454,7 +524,7 @@ public class wdbm implements extools {
                     DisplayPrompt(Prompt[0]);
                     DisplayStatusLine(String.format("Term Dimensions %3s col x %-3srow", Tsize.getColumns(), Tsize.getRows()));
                 }
-                TopWindow().Refresh();
+                ApropriateWindow().Refresh();
             }
         }
         return KeyReceived;
@@ -477,47 +547,98 @@ public class wdbm implements extools {
      * @throws SQLException
      * @throws InterruptedException;
      */
-    public Key ActivateForm(ResultSet LocalResult) throws SQLException,InterruptedException {
-        Key ExitedWithKey = null;
-        WindowStack.push(new TerminalWindow(FirstScrollInDefaultForm(),0,0,DefaultFormTemplate.size()+3,83));
-        do {
-            try {
-                FormDisplay(LocalResult);
-                String ScrollFieldName = FirstScrollInDefaultForm();
-                if (ScrollFieldName != null) {
-                    ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
-                    if (ExitedWithKey.getKind() == Key.Kind.Enter) ActivateForm(WithTheIndexScroll(ScrollFieldName).Results);
-                    DisplayPrompt(FormMenuPrompt);
-                } else {
-                    ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
-                }
-                if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
-                    if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
-                        LocalResult.next();
-                    } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
-                        LocalResult.previous();
-                    } else if (ExitedWithKey.getCharacter() == 'e') {
-                        unpackCurrentRecord(LocalResult);
-                        FormEditor();
-                    }
-                }
-            } catch (SQLException ex) {
-                DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
-                ex.printStackTrace();
-            }
-        } while (ExitedWithKey.getKind() != Key.Kind.Escape && ExitedWithKey.getKind() != Key.Kind.ReverseTab);
-        WindowStack.pop().screenHandle.stopScreen();
-        return ExitedWithKey;
+    public void ActivateForm(ResultSet LocalResult,List<String>... RecordBuffer) throws SQLException,InterruptedException {
+        QuantumForkForm NewForm ;
+         //   ActivatedFormQueue.add(LocalResult);
+        ActivateFormThread = new Thread(NewForm = new QuantumForkForm());
+        
+        
+        NewForm.LocalResult = LocalResult;
+       
+        if (RecordBuffer.length > 0) {
+            unpackCurrentRecord(LocalResult);
+            NewForm.RecordBuffer = CurrentRecord;
+        }
+
+        
+        ActivatedFormsThreadPool.add(ActivateFormThread);
+        ActivateFormThread.start();
+        
+        //WindowStack.push(new TerminalWindow(0, 0, DefaultFormTemplate.size() + 3, 83));
+        // WindowStack.peek().ThreadPool.clear();
+        // WindowStack.peek().ThreadPool.add(ActivateFormThread.getId());
+        // ApropriateWindow().ThreadPool.add(Thread.currentThread().getId());
     }
-     
+    public Thread ActivateFormThread;
+  //  private final BlockingQueue<ResultSet> ActivatedFormQueue = new LinkedBlockingQueue();
+    
+    public class QuantumForkForm implements Runnable {
+
+        public Key ExitedWithKey = null;
+        public ResultSet LocalResult = null;
+        public TerminalWindow AttachedWindow;
+        public List<String> RecordBuffer = new ArrayList();
+
+        @Override
+        public void run() {
+            try {
+                WindowStack.push(AttachedWindow = new TerminalWindow(0, 0, DefaultFormTemplate.size() + 3, 83));
+                AttachedWindow.Refresh();
+                do {
+                    
+                    // new search atom for scrolls in form template.
+                   // unpackCurrentRecord();
+                   // RecordBuffer = CurrentRecord;
+                    FormDisplay(LocalResult, AttachedWindow);
+                    AttachedWindow.Refresh();
+                    String ScrollFieldName = FirstScrollInDefaultForm();
+WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(WithTheIndexScroll(ScrollFieldName).ReSearch(ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName))), AttachedWindow));
+                    if (ScrollFieldName != null) {
+                        ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
+                        if (ExitedWithKey.getKind() == Key.Kind.Enter) {
+                            //Syncronise 
+                            ActivateForm(WithTheIndexScroll(ScrollFieldName).CurrentSearchAtom.AtomicResultSet,RecordBuffer);
+                        }
+                        DisplayPrompt(FormMenuPrompt);
+                    } else {
+                        ExitedWithKey = KeyInput(FormMenuPrompt); //"[ESC]Back  [E]dit                             [N]ext [P]rev      [Home]Exit");
+                    }
+
+                    if (ExitedWithKey.getKind() == Key.Kind.NormalKey) {
+                        if (ExitedWithKey.getCharacter() == 'n' && !LocalResult.isLast()) {
+                            LocalResult.next();
+                        } else if (ExitedWithKey.getCharacter() == 'p' && !LocalResult.isFirst()) {
+                            LocalResult.previous();
+                        } else if (ExitedWithKey.getCharacter() == 'e') {
+                            unpackCurrentRecord(LocalResult);
+                            FormEditor();
+                        }
+                    }
+                } while (ExitedWithKey.getKind() != Key.Kind.ReverseTab);
+            } catch (Exception ex) {
+                //  DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
+                ex.printStackTrace();
+            } finally {
+                AttachedWindow.screenHandle.stopScreen();
+            }
+        }
+    }
+    
     private Thread ActivatedWDBM;
     public void ActivateWDBM (boolean... Daemonise) throws SQLException,InterruptedException {
         
-       ActivatedWDBM = new Thread(new QuantumForkActivateWDBM());
-       ActivatedWDBM.start();
-       
-       if (Daemonise.length> 0 && !Daemonise[0]) ActivatedWDBM.join();
         
+        
+        ActivatedWDBM = new Thread(new QuantumForkActivateWDBM());
+
+        //   WindowStack.push(DefaultWindow = new TerminalWindow(0,0,30,83));
+   //     WindowStack.push(new TerminalWindow(0, 0, 30, 83));
+        WindowStack.peek().ThreadPool.add(ActivatedWDBM.getId());
+        ActivatedWDBM.start();
+        if (Daemonise.length > 0 && !Daemonise[0]) {
+            ActivatedWDBM.join();
+        }
+
     }
     
     public class QuantumForkActivateWDBM implements Runnable {
@@ -527,9 +648,10 @@ public class wdbm implements extools {
             boolean onceInterrupt = false;
             try {
                 while (DefaultScroll.ActivateScroll().getKind() != Key.Kind.ReverseTab) {
-                    if (ActivateForm(DefaultScroll.Results).getKind() == Key.Kind.ReverseTab) {
-                        return; //throw new SQLException("Exiting Exception ");
-                    }
+                    ActivateForm(WithTheIndexScroll("default").SearchAtomStack.peek().AtomicResultSet); //DefaultScroll.Results);
+                  //  if (ActivateForm(DefaultScroll.Results).getKind() == Key.Kind.ReverseTab) {
+                  //      return; //throw new SQLException("Exiting Exception ");
+                  //  }
                 }
             } catch (Exception ex) {
                 System.err.println(ex.getClass().getName() + ": " + ex.getMessage());
@@ -549,6 +671,7 @@ public class wdbm implements extools {
    
     public class TerminalWindow {
         public String Name;
+        public List<Long> ThreadPool = new ArrayList();
         public Terminal rawTerminal;
         public Screen screenHandle;
         public ScreenWriter screenWriter = null;
@@ -557,8 +680,12 @@ public class wdbm implements extools {
         public int Length = 0;
         public int Width = 0;
 
-        public TerminalWindow(String name,int column,int row,int length,int width,wdbm... CloneFrom) {
-            Name = name;
+        public TerminalWindow(int column,int row,int length,int width,wdbm... CloneFrom) throws SQLException {
+            // Name = name;
+            
+            //if (Thread.currentThread() != null) 
+                ThreadPool.add(Thread.currentThread().getId());
+            
             if (CloneFrom.length > 0) {
                 rawTerminal = CloneFrom[0].TopWindow().rawTerminal;
                 screenHandle = CloneFrom[0].TopWindow().screenHandle;
@@ -578,6 +705,7 @@ public class wdbm implements extools {
                 screenWriter.setForegroundColor(Terminal.Color.WHITE);
                 screenWriter.setBackgroundColor(Terminal.Color.BLACK);
             }
+            
         }
 
         
@@ -589,9 +717,11 @@ public class wdbm implements extools {
             screenHandle.setCursorPosition(col, row);
         }
 
-        public void Refresh () {
-            screenHandle.refresh();
-        }
+public void Refresh () {
+  //  for (TerminalWindow iter : WindowStack) {
+                    screenHandle.refresh();
+  //  }
+}
         
         public void Clear() {
             screenHandle.clear();
@@ -605,10 +735,44 @@ public class wdbm implements extools {
             return rawTerminal.getTerminalSize();
         }
       
-        public TerminalWindow TopWindow() {
-            return WindowStack.peek();
+        public TerminalWindow TopWindow() throws SQLException {
+            return NamedWindow(Thread.currentThread().getId());
+            // return WindowStack.peek();
         }
-  
+        
+        public TerminalWindow ApropriateWindow(long... OverrideThread) throws SQLException {
+            long searcher;
+        if ( OverrideThread.length > 0 ) searcher = OverrideThread[0];
+        else searcher = Thread.currentThread().getId();
+        for (TerminalWindow searchWindow : WindowStack) {
+            for (long iter : searchWindow.ThreadPool) {
+                if (iter == searcher) {
+                    return searchWindow;
+                }
+            }
+        }
+        throw new SQLException("Could Not find Apropriate window");
+    }
+        
+        
+    /*    public TerminalWindow AproprateWindow(Thread searcher) throws SQLException {
+            for (TerminalWindow searchWindow : WindowStack ) {
+                for (long iter : searchWindow.ThreadPool) {
+                    if (iter == searcher.getId()) return searchWindow ;
+                }
+            }
+            throw new SQLException("Could Not find Apropriate window");
+        }*/
+        
+        public TerminalWindow NamedWindow(long searchfor) throws SQLException {
+            for (TerminalWindow searchWindow : WindowStack) {
+                for (long iter : searchWindow.ThreadPool) {
+                    if (iter == searchfor) return searchWindow;
+                }
+                
+            } 
+            throw new SQLException("Could Not find Named window");
+        }
     }
     
 }     
