@@ -53,7 +53,7 @@ public class texaco implements extools {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
     }
     
-    private void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
+    private void BlankLastCharacterOfFieldBeingEdited(int x,int y) throws SQLException {
         AttachedWDBM.TopWindow().DisplayString(x + LineEditorBuffer.length(), y, " ");
     }
     
