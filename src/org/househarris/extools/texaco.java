@@ -53,8 +53,8 @@ public class texaco implements extools {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
     }
     
-    private void BlankLastCharacterOfFieldBeingEdited(int x,int y) throws SQLException {
-        AttachedWDBM.TopWindow().DisplayString(x + LineEditorBuffer.length(), y, " ");
+    private void BlankLastCharacterOfFieldBeingEdited(wdbm.TerminalWindow Terminal,int x,int y) throws SQLException {
+        Terminal.DisplayString(x + LineEditorBuffer.length(), y, " ");
     }
     
     /**
@@ -68,26 +68,26 @@ public class texaco implements extools {
      * @return
      * @throws SQLException
      */
-    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException,InterruptedException {
+    public String LineEditor(wdbm.TerminalWindow Terminal,int x, int y, int LengthLimit, String... InitialValue) throws SQLException,InterruptedException {
         Key KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
 //        else LineEditorBuffer = "";
         if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
         while (true) {
-            AttachedWDBM.TopWindow().DisplayString(x, y, LineEditorBuffer);
-            AttachedWDBM.TopWindow().screenHandle.setCursorPosition(x + LineEditorPosition, y);
-            AttachedWDBM.TopWindow().screenHandle.refresh();
-            LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput();
+            Terminal.DisplayString(x, y, LineEditorBuffer);
+            Terminal.screenHandle.setCursorPosition(x + LineEditorPosition, y);
+            Terminal.screenHandle.refresh();
+           LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput(Terminal);
             if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
                 InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
                 LineEditorPosition++;
             } else if (KeyReceived.getKind() == Key.Kind.Backspace && LineEditorPosition > 0) {
                 LineEditorPosition--;
                 DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
+                BlankLastCharacterOfFieldBeingEdited(Terminal,x, y);
             } else if (KeyReceived.getKind() == Key.Kind.ArrowDown && LineEditorPosition < LineEditorBuffer.length()) {   // using down arrow for delete key
                 DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
+                BlankLastCharacterOfFieldBeingEdited(Terminal,x, y);
             } else if (KeyReceived.getKind() == Key.Kind.ArrowLeft && LineEditorPosition > 0) {
                 LineEditorPosition--;
             } else if (KeyReceived.getKind() == Key.Kind.ArrowRight && LineEditorPosition < LineEditorBuffer.length()) {
