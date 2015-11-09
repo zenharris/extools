@@ -217,6 +217,7 @@ public class indexscroll implements extools {
      * @throws InterruptedException;
      * @return New SearchAtom if called with no currentSearchAtom.
      */
+    /*
     public searchAtom ReSearch(searchAtom RecycleAtom,String NewSQLQuery,TerminalWindow... ToTerm) throws SQLException, InterruptedException {
         searchAtom SearchAtom;
         TerminalWindow UseWindow;
@@ -242,13 +243,13 @@ public class indexscroll implements extools {
         RecycleAtom.AtomicSQL = NewSQLQuery;
         boolean add = SQLQueryQueue.add(RecycleAtom); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
         SQLQueryQueueLock.release();
-        SQLQueryThread = new Thread(new QuantumForkReSearch());
+        SQLQueryThread = new Thread(new QuantumResearchDaemon());
         UseWindow.ThreadPool.add(SQLQueryThread.getId());
         
         SQLQueryThread.start();
         return RecycleAtom;
     }
-
+*/
     public searchAtom returnNewSearchAtom(String SQLStatement,wdbm Wdbm) throws SQLException {
         return new searchAtom(SQLStatement, Wdbm);
         
@@ -265,26 +266,67 @@ public class indexscroll implements extools {
             AtomicSQLMainPipe = Wdbm.SQLconnection; //SQLMainPipe;
             AtomicSQL = SQLStatement;
             AtomicOutTerminal = Wdbm.WindowStack.peek(); //Terminal;
-          //  AtomicResultSet = Results;
+            //  AtomicResultSet = Results;
             AtomicCompiledStatement = AtomicSQLMainPipe.prepareStatement(SQLStatement, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
             AtomicResultSet = AtomicCompiledStatement.executeQuery();
-            if (!AtomicResultSet.first()) throw new SQLException("searchAtom Error Condition -> no find first");
+            if (!AtomicResultSet.first()) {
+                throw new SQLException("searchAtom Error Condition -> no find first");
+            }
         }
+
+        public searchAtom Recycle(String NewSQLQuery, TerminalWindow... ToTerm) throws SQLException, InterruptedException {
+            TerminalWindow UseWindow;
+ 
+            if (ToTerm.length > 0) UseWindow = ToTerm[0];
+            else UseWindow = AtomicOutTerminal;
+
+            if (NewSQLQuery.equals(AtomicSQL)) return this;
+
+            if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
+                
+                if (SQLQueryQueue.size() > 1) {
+                    SQLQueryThread.interrupt();
+                }
+                SQLQueryQueue.clear();  //overrun mittigated
+                
+                //      SQLQueryQueue.add(SearchAtom = new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+                AtomicSQL = NewSQLQuery;
+                if (ToTerm.length > 0) {
+                    AtomicOutTerminal = ToTerm[0];
+                }
+                SQLQueryQueue.add(this); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+                return this;
+            }
+            AtomicSQL = NewSQLQuery;
+            boolean add = SQLQueryQueue.add(this); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+            SQLQueryThread = new Thread(new QuantumResearchDaemon());
+            
+            UseWindow.ThreadPool.add(SQLQueryThread.getId());
+
+            SQLQueryThread.start();
+            return this;
+        }
+
+        
+        
+        
+        
+        
     }
     
-    public class QuantumForkReSearch implements Runnable {
+    public class QuantumResearchDaemon implements Runnable {
         @Override
         public void run() {
            // ResultSet LocalResults;
             TerminalWindow Terminal = null;
             try {
                 do {
-                        SQLQueryQueueLock.acquire();
+                     //   SQLQueryQueueLock.acquire();
                         searchAtom QueuedParameter = SQLQueryQueue.take();
                     ///    String NewSQLQuery = SQLQueryQueue.take();
                         Terminal = QueuedParameter.AtomicOutTerminal;
 
-                        SQLQueryQueueLock.release();
+                       // SQLQueryQueueLock.release();
                        // if (!QueuedParameter.AtomicSQL.equals(CurrentSQLQuery)) {
                             AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
                             Terminal.Refresh();
@@ -341,11 +383,8 @@ public class indexscroll implements extools {
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
             String LocalString = AttachedWDBM.PromptForString("->",UseWindow);
             if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
-//                SearchAtomStack.push(CurrentSearchAtom = ReSearch(LocalString,UseWindow));
-                CurrentSearchAtom = ReSearch(CurrentSearchAtom,LocalString);
-
-                Results = CurrentSearchAtom.AtomicResultSet;
-
+                Results = CurrentSearchAtom.Recycle(LocalString).AtomicResultSet;
+                // Results = CurrentSearchAtom.AtomicResultSet;
             }
         } catch (SQLException ex) {
             AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLState " + ex.getSQLState(),UseWindow);
