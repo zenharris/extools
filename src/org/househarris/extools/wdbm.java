@@ -708,9 +708,9 @@ public class wdbm implements extools {
                 ThreadPool.add(Thread.currentThread().getId());
             
             if (CloneFrom.length > 0) {
-                rawTerminal = CloneFrom[0].TopWindow().rawTerminal;
-                screenHandle = CloneFrom[0].TopWindow().screenHandle;
-                screenWriter = CloneFrom[0].TopWindow().screenWriter;
+                rawTerminal = CloneFrom[0].rawTerminal;
+                screenHandle = CloneFrom[0].screenHandle;
+                screenWriter = CloneFrom[0].screenWriter;
             } else {
                 rawTerminal = TerminalFacade.createTerminal();
                 TerminalSize Tsize = rawTerminal.getTerminalSize();
