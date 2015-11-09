@@ -348,13 +348,8 @@ public class wdbm implements extools {
                 if (Field.split(SplittingColon)[1].equals(IndexScrollFieldLabel)) {
                     if (!onceScroll) {
                         onceScroll = true;
-                        searchAtom temp = WithTheIndexScroll(FieldName).ReSearch(WithTheIndexScroll(FieldName).CurrentSearchAtom,ResolveSQLStatementInFieldTemplate(Field));
-                    //    WithTheIndexScroll(FieldName).Results = temp.AtomicResultSet;
-                    //    WithTheIndexScroll(FieldName).SearchAtomStack.push(temp);
+                        WithTheIndexScroll(FieldName).CurrentSearchAtom.Recycle(ResolveSQLStatementInFieldTemplate(Field));
                         WithTheIndexScroll(FieldName).ReDrawScroll();
-                       
-// IndexScroll(FieldName).ReDrawScroll();
-                        
                     }
                     LineBuffer = "";
                 } else {
@@ -580,10 +575,6 @@ public class wdbm implements extools {
         ActivatedFormsThreadPool.add(ActivateFormThread);
         ActivateFormThread.start();
         
-        //WindowStack.push(new TerminalWindow(0, 0, DefaultFormTemplate.size() + 3, 83));
-        // WindowStack.peek().ThreadPool.clear();
-        // WindowStack.peek().ThreadPool.add(ActivateFormThread.getId());
-        // ApropriateWindow().ThreadPool.add(Thread.currentThread().getId());
     }
     public Thread ActivateFormThread;
   //  private final BlockingQueue<ResultSet> ActivatedFormQueue = new LinkedBlockingQueue();
@@ -596,6 +587,7 @@ public class wdbm implements extools {
         public TerminalWindow AttachedWindow;
         public List<String> RecordBuffer = new ArrayList();
         private boolean Once = false;
+        private indexscroll ThisScroll;
         @Override
         public void run() {
             try {
@@ -604,41 +596,26 @@ public class wdbm implements extools {
                 do {
          
                     // new search scroll&atom for scrolls in form template.
-                   // if (!Once) {
-                    //    Once = true;
-                        for (String Field : DefaultFormFieldList) {
-                            String[] FieldElements = Field.split(SplittingColon);
-                            if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                                if (!Once){
-                                    Once = true;
-                                IndexScrolls.add(new indexscroll(FieldElements[0] + Thread.currentThread().getId(), ResolveSQLStatementInFieldTemplate(Field), AttachedWdbm, MeasureDimensionsOf(FieldElements[0])));
-                                } else WithTheIndexScroll(FieldElements[0]).CurrentSearchAtom = WithTheIndexScroll(FieldElements[0]).ReSearch(WithTheIndexScroll(FieldElements[0]).CurrentSearchAtom,ResolveSQLStatementInFieldTemplate(Field));  //ConnectedForm = true;
+                    for (String Field : DefaultFormFieldList) {
+                        String[] FieldElements = Field.split(SplittingColon);
+                        if (FieldElements[1].equals(IndexScrollFieldLabel)) {
+                            if (!Once) {
+                                Once = true;
+                                IndexScrolls.add(ThisScroll = new indexscroll(FieldElements[0] + Thread.currentThread().getId(),
+                                        ResolveSQLStatementInFieldTemplate(Field), AttachedWdbm, MeasureDimensionsOf(FieldElements[0])));
+                            } else {
+                                WithTheIndexScroll(FieldElements[0]).CurrentSearchAtom.Recycle(ResolveSQLStatementInFieldTemplate(Field));  //ConnectedForm = true;
                             }
                         }
-                   // }
-                    
-                    
-                   // unpackCurrentRecord();
-                   // RecordBuffer = CurrentRecord;
+                    }
+
                     FormDisplay(LocalResult, AttachedWindow);
                     AttachedWindow.Refresh();
                     String ScrollFieldName = FirstScrollInDefaultForm();
                     if (ScrollFieldName != null) {
-/// WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(WithTheIndexScroll(ScrollFieldName).ReSearch(ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName))), AttachedWindow));
-                     //   String PushSql = ResolveSQLStatementInFieldTemplate(DefaultFormFieldList.get(GetFieldNumber(ScrollFieldName)));
-                     //   searchAtom push;
-                     //   push = DefaultScroll.returnNewSearchAtom(PushSql, AttachedWdbm);
-                     //   WithTheIndexScroll(ScrollFieldName).CurrentSearchAtom = push;
-                        
-                     //    WithTheIndexScroll(ScrollFieldName).SearchAtomStack.push(push);
                        ExitedWithKey = WithTheIndexScroll(ScrollFieldName).ActivateScroll();
                         if (ExitedWithKey.getKind() == Key.Kind.Enter) {
-                            //Syncronise 
                             ActivateForm(WithTheIndexScroll(ScrollFieldName).CurrentSearchAtom.AtomicResultSet);
-                            
-                        //    WithTheIndexScroll(ScrollFieldName).SearchAtomStack.remove(push);
-                        //    WithTheIndexScroll(ScrollFieldName).AttachedWDBM.WindowStack.remove(AttachedWindow);
-                            
                         }
                         DisplayPrompt(FormMenuPrompt,AttachedWindow);
                     } else {
@@ -661,8 +638,16 @@ public class wdbm implements extools {
                 //  DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
                 ex.printStackTrace();
             } finally {
-                
+              
                 AttachedWindow.screenHandle.stopScreen();
+
+                if (Once) {
+                    ThisScroll.SearchAtomStack.remove(ThisScroll.CurrentSearchAtom);
+                    ThisScroll.AttachedWDBM.WindowStack.remove(AttachedWindow);
+                    ThisScroll.SQLQueryThread.interrupt();
+                }
+
+
             }
         }
     }
@@ -670,12 +655,8 @@ public class wdbm implements extools {
     private Thread ActivatedWDBM;
     public void ActivateWDBM (boolean... Daemonise) throws SQLException,InterruptedException {
         
-        
-        
         ActivatedWDBM = new Thread(new QuantumForkActivateWDBM());
 
-        //   WindowStack.push(DefaultWindow = new TerminalWindow(0,0,30,83));
-   //     WindowStack.push(new TerminalWindow(0, 0, 30, 83));
         WindowStack.peek().ThreadPool.add(ActivatedWDBM.getId());
         ActivatedWDBM.start();
         if (Daemonise.length > 0 && !Daemonise[0]) {
@@ -688,7 +669,6 @@ public class wdbm implements extools {
 
         @Override
         public void run() {
-            boolean onceInterrupt = false;
             try {
                 while (DefaultScroll.ActivateScroll(DefaultScroll.CurrentSearchAtom.AtomicOutTerminal).getKind() != Key.Kind.ReverseTab) {
                     ActivateForm(WithTheIndexScroll("default").CurrentSearchAtom.AtomicResultSet); //DefaultScroll.Results);
@@ -700,14 +680,11 @@ public class wdbm implements extools {
                 System.err.println(ex.getClass().getName() + ": " + ex.getMessage());
                 ex.printStackTrace();
             } finally {
-                
-        /*        for (indexscroll iter : IndexScrolls) {
-                    if (!onceInterrupt) onceInterrupt = true;
-                    else iter.SQLQueryThread.interrupt();
-                }
-                */
                 DefaultWindow.screenHandle.stopScreen();
-              //  IndexScrolls.get(0).SQLQueryThread.interrupt();
+
+                for (indexscroll iter : IndexScrolls) {
+                    iter.SQLQueryThread.interrupt();
+                }
 
             }
         }
