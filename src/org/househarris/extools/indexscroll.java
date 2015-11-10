@@ -349,7 +349,9 @@ public class indexscroll implements extools {
                         AttachedWDBM.DisplayStatusLine("");
 //                    AttachedWDBM.screenHandle.refresh();
                 } while (true);
-            } catch (InterruptedException | NoSuchElementException | SQLException | NullPointerException ex) {
+            } catch (InterruptedException IEx) {
+                
+            } catch (NoSuchElementException | SQLException | NullPointerException ex) {
                 try {
                     // SQLQueryQueue.clear();
                     AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen",Terminal);
