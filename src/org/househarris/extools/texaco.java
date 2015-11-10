@@ -98,6 +98,11 @@ public class texaco implements extools {
         }
     }
 
+    @Override
+    public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
  
 }
     
