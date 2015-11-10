@@ -5,6 +5,7 @@
  */
 package org.househarris.extools;
 
+import java.sql.SQLException;
 import java.util.Stack;
 import org.househarris.extools.wdbm.TerminalWindow;
 
@@ -42,8 +43,16 @@ public interface extools {
     /**
      *Stack containing Terminal Window definitions
      */
-    //public Stack<TerminalWindow> WindowStack = new Stack();
+  //  public Stack<TerminalWindow> WindowStack = new Stack();
     
     //public TerminalWindow TopWindow();
+    
+    /**
+     * Stack containing Terminal Window definitions
+     * @param ScrollName
+     * @return 
+     * @throws java.sql.SQLException 
+     */
+    public indexscroll WithTheIndexScroll(String ScrollName)throws SQLException;
     
 }
