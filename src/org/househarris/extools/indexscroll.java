@@ -82,11 +82,8 @@ public class indexscroll implements extools {
             ListScreenTopLine = Dimensions[0];
             ListScreenLength = WDBMAttach.WindowStack.peek().rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
         }
-        /// SearchAtomStack.peek().AtomicOutTerminal.rawTerminal
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
         SearchAtomStack.push(CurrentSearchAtom = new searchAtom(SQLQuery, WDBMAttach));
-       // CurrentSearchAtom.AtomicStatement = stmt = WDBMAttach.SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-       // CurrentSearchAtom.AtomicResultSet = Results = stmt.executeQuery(SQLQuery);
         Results = SearchAtomStack.peek().AtomicResultSet;
         if (!Results.first()) System.err.println("This returned nothing " + SQLQuery);     //      Empirical kudge ????
 
@@ -95,65 +92,16 @@ public class indexscroll implements extools {
         AttachedWDBM = WDBMAttach;
         CurrentSQLQuery = SQLQuery;
         IndexScrollName = ScrollName;
-        ListScrollsIndex = AttachedWDBM.IndexScrolls.size();
+        ListScrollsIndex = AttachedWDBM.ScrollStack.size();
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
-    /*
-    public TerminalWindow TopWindow() {
-        System.err.println("Thread -> "+Thread.currentThread().getId());
-        return NamedWindow(Thread.currentThread().getId());
-       //  return AttachedWDBM.WindowStack.peek();
-    }
- 
-    public TerminalWindow NamedWindow(long searchfor) {
-        for (TerminalWindow SearchPointer : AttachedWDBM.WindowStack) {
-            if (SearchPointer.ThreadId == searchfor) return SearchPointer;
-        }
-        return null; // AttachedWDBM.WindowStack.peek();
-       // return null;
-    } 
-    */
-       public TerminalWindow TopWindow() throws SQLException {
-           return ApropriateWindow();
-            // return NamedWindow(Thread.currentThread().getId());
-            // return WindowStack.peek();
-        }
-     
-    public TerminalWindow ApropriateWindow(long... OverrideThread) throws SQLException {
-        long searcher;
-        if (OverrideThread.length > 0) searcher = OverrideThread[0];
-        else searcher = Thread.currentThread().getId();
-        for (TerminalWindow searchWindow : AttachedWDBM.WindowStack) {
-            for (long iter : searchWindow.ThreadPool) {
-                if (iter == searcher) {
-                    return searchWindow;
-                }
-            }
-        }
-        throw new SQLException("Could Not find Apropriate window");
-    }
-       
-        public TerminalWindow NamedWindow(long searchfor) throws SQLException {
-            for (TerminalWindow searchWindow : AttachedWDBM.WindowStack) {
-                for (long iter : searchWindow.ThreadPool) {
-                    if (iter == searchfor) return searchWindow;
-                }
-                
-            } 
-            throw new SQLException("Could Not find Named window");
-        }
-    
-    
-    
     
     //private List<String> Substitute = new ArrayList();
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList,ResultSet LocalResult) throws SQLException {
         List<String> Substitute = new ArrayList();
-   //     int iter = 0;
    //     Substitute.clear();
         for (String FieldName : FieldNameList) {
-        boolean add = Substitute.add(LocalResult.getString(FieldName));
-//            Substitute.add(Results.getString(FieldName));
+            boolean add = Substitute.add(LocalResult.getString(FieldName));
         }
       //  String[] returnArray = Substitute.toArray();
         return Substitute;
@@ -181,7 +129,6 @@ public class indexscroll implements extools {
         }
         iter--;
         while (iter++ < ListScreenLength-1) UseWindow.DisplayString(0, ListScreenTopLine+iter, BLANK);
-        // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
         CurrentSearchAtom.AtomicResultSet.absolute(SaveResultRow);
     }
 
@@ -204,56 +151,19 @@ public class indexscroll implements extools {
     }
     
     public Thread SQLQueryThread;
-    //private Queue SQLQueryQueue = new LinkedList();
     private final BlockingQueue<searchAtom> SQLQueryQueue = new LinkedBlockingQueue();
-//    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
-    private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
-
-    /**
-     * Recycles Current Search Atom giving it a new SQL query and optionally a new Terminal Window to send it's output.
-     * @param NewSQLQuery
-     * @param ToTerm Optional TerminalWindow to send all output
-     * @throws SQLException
-     * @throws InterruptedException;
-     * @return New SearchAtom if called with no currentSearchAtom.
-     */
-    /*
-    public searchAtom ReSearch(searchAtom RecycleAtom,String NewSQLQuery,TerminalWindow... ToTerm) throws SQLException, InterruptedException {
-        searchAtom SearchAtom;
-        TerminalWindow UseWindow;
-        if (ToTerm.length>0) UseWindow = ToTerm[0];
-        else UseWindow = RecycleAtom.AtomicOutTerminal;
-        
-        if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
-            if (SQLQueryQueue.size() > 1) {
-            //    SQLQueryQueueLock.acquire();
-                SQLQueryThread.interrupt();
-            }
-//            SQLQueryThread.join();
-            SQLQueryQueue.clear();  //overrun mittigated
-    //      SQLQueryQueue.add(SearchAtom = new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
-            RecycleAtom.AtomicSQL = NewSQLQuery;
-            if (ToTerm.length>0) RecycleAtom.AtomicOutTerminal = ToTerm[0];
-            SQLQueryQueue.add(RecycleAtom); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
-          ////  if (ApropriateWindow().ThreadPool)
-           // ApropriateWindow().ThreadPool.add(SQLQueryThread.getId());
-            SQLQueryQueueLock.release();
-            return RecycleAtom;
-        }
-        RecycleAtom.AtomicSQL = NewSQLQuery;
-        boolean add = SQLQueryQueue.add(RecycleAtom); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
-        SQLQueryQueueLock.release();
-        SQLQueryThread = new Thread(new QuantumResearchDaemon());
-        UseWindow.ThreadPool.add(SQLQueryThread.getId());
-        
-        SQLQueryThread.start();
-        return RecycleAtom;
-    }
-*/
+    
     public searchAtom returnNewSearchAtom(String SQLStatement,wdbm Wdbm) throws SQLException {
         return new searchAtom(SQLStatement, Wdbm);
         
     }
+
+    @Override
+    public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+  
+    
     public class searchAtom{
         Connection AtomicSQLMainPipe;
         String AtomicSQL;
@@ -274,14 +184,25 @@ public class indexscroll implements extools {
             }
         }
 
+        /**
+         * Recycles Current Search Atom giving it a new SQL query and optionally
+         * a new Terminal Window to send it's output.
+         *
+         * @param NewSQLQuery
+         * @param ToTerm Optional TerminalWindow to send all output
+         * @throws SQLException
+         * @throws InterruptedException;
+         * @return New SearchAtom if called with no currentSearchAtom.
+         */
         public searchAtom Recycle(String NewSQLQuery, TerminalWindow... ToTerm) throws SQLException, InterruptedException {
             TerminalWindow UseWindow;
- 
-            if (ToTerm.length > 0) UseWindow = ToTerm[0];
+
+            if (ToTerm.length > 0)
+                UseWindow = ToTerm[0];
             else UseWindow = AtomicOutTerminal;
 
             if (NewSQLQuery.equals(AtomicSQL)) return this;
-
+          
             if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
                 
                 if (SQLQueryQueue.size() > 1) {
@@ -308,10 +229,6 @@ public class indexscroll implements extools {
         }
 
         
-        
-        
-        
-        
     }
     
     public class QuantumResearchDaemon implements Runnable {
@@ -321,12 +238,9 @@ public class indexscroll implements extools {
             TerminalWindow Terminal = null;
             try {
                 do {
-                     //   SQLQueryQueueLock.acquire();
                         searchAtom QueuedParameter = SQLQueryQueue.take();
-                    ///    String NewSQLQuery = SQLQueryQueue.take();
                         Terminal = QueuedParameter.AtomicOutTerminal;
 
-                       // SQLQueryQueueLock.release();
                        // if (!QueuedParameter.AtomicSQL.equals(CurrentSQLQuery)) {
                             AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
                             Terminal.Refresh();
@@ -334,7 +248,6 @@ public class indexscroll implements extools {
                             CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(QueuedParameter.AtomicSQL, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                             QueuedParameter.AtomicCompiledStatement = CurrentCompiledSQLStatement;
                             QueuedParameter.AtomicResultSet = CurrentCompiledSQLStatement.executeQuery();
-                            
                             
                             if (QueuedParameter.AtomicResultSet.first()) {
                             //    Results = QueuedParameter.AtomicResultSet;
@@ -362,7 +275,6 @@ public class indexscroll implements extools {
             } catch (IllegalMonitorStateException ex) {
           //     AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen"); 
             }finally {
-                SQLQueryQueueLock.release();
             }
         }
     }
@@ -378,7 +290,6 @@ public class indexscroll implements extools {
         
         if (ToTerm.length>0) UseWindow = ToTerm[0];
         else UseWindow = CurrentSearchAtom.AtomicOutTerminal;
-        
         
         try {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
@@ -403,15 +314,10 @@ public class indexscroll implements extools {
         Key KeyReturn;
         TerminalSize Tsize;
         TerminalWindow UseWindow;
+
         if (AttachedWindow.length>0) UseWindow = AttachedWindow[0];
         else UseWindow = CurrentSearchAtom.AtomicOutTerminal;
         
-        //CurrentSearchAtom = new searchAtom(CurrentSQLQuery,UseWindow);
-        //CurrentSearchAtom.AtomicResultSet = Results;
-        
-        
-        
-        // ReDrawScroll(CurrentSearchAtom);
         ReDrawScroll();
         
         while (true) {
