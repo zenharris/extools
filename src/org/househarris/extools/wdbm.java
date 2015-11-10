@@ -47,6 +47,8 @@ import java.sql.SQLException;
 import java.util.Date;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.househarris.extools.indexscroll.searchAtom;
 // import java.util.concurrent.Executor;
 // import java.text.SimpleDateFormat;
@@ -72,8 +74,8 @@ public class wdbm implements extools {
     public Connection SQLconnection;
     public ResultSet CurrentRecordResultSet;
 
-    public List<indexscroll> IndexScrolls = new ArrayList();
-    public List<Thread> ActivatedFormsThreadPool = new ArrayList();
+    public Stack<indexscroll> IndexScrolls = new Stack();
+    public Stack<Thread> ActivatedFormsThreadPool = new Stack();
   
     public List<String> ErrorLog = new ArrayList();
     public String CurrentErrorBuffer = "";
@@ -208,14 +210,14 @@ public class wdbm implements extools {
         for (String Field : DefaultFormFieldList) {
             String[] FieldElements = Field.split(SplittingColon);
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                IndexScrolls.add(new indexscroll(FieldElements[0], ResolveSQLStatementInFieldTemplate(Field), this, MeasureDimensionsOf(FieldElements[0])));
+                IndexScrolls.push(new indexscroll(FieldElements[0], ResolveSQLStatementInFieldTemplate(Field), this, MeasureDimensionsOf(FieldElements[0])));
                 // IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
     }
     
     public void CreateDefaultScroll(int... Dimensions) throws SQLException {
-        IndexScrolls.add(DefaultScroll = new indexscroll("default", DefaultScrollSearchSQL, this, Dimensions));
+        IndexScrolls.push(DefaultScroll = new indexscroll("default", DefaultScrollSearchSQL, this, Dimensions));
         DefaultScroll.ConnectedForm = true;
     }
 
@@ -571,13 +573,13 @@ public class wdbm implements extools {
             NewForm.RecordBuffer = CurrentRecord;
         }
 
-        
+        ActivatedFormStack.push(NewForm);
         ActivatedFormsThreadPool.add(ActivateFormThread);
         ActivateFormThread.start();
         
     }
     public Thread ActivateFormThread;
-  //  private final BlockingQueue<ResultSet> ActivatedFormQueue = new LinkedBlockingQueue();
+     final Stack<QuantumForkForm> ActivatedFormStack = new Stack();
     
     public class QuantumForkForm implements Runnable {
 
@@ -586,28 +588,34 @@ public class wdbm implements extools {
         public wdbm AttachedWdbm;
         public TerminalWindow AttachedWindow;
         public List<String> RecordBuffer = new ArrayList();
-        private boolean Once = false;
+        private boolean ScrollPresent = false;
+        private String ScrollName;
+        private String ScrollField;
         private indexscroll ThisScroll;
         @Override
         public void run() {
             try {
                 WindowStack.push(AttachedWindow = new TerminalWindow(0, 0, DefaultFormTemplate.size() + 3, 83));
                 AttachedWindow.Refresh();
+                
+                for (String Field : DefaultFormFieldList) {
+                    String[] FieldElements = Field.split(SplittingColon);
+                    if (FieldElements[1].equals(IndexScrollFieldLabel)) {
+                        if (!ScrollPresent) {
+                            ScrollPresent = true;
+                            ScrollName = FieldElements[0];
+                            ScrollField = Field;
+                            IndexScrolls.push(ThisScroll = new indexscroll(ScrollName + Thread.currentThread().getId(),
+                                    ResolveSQLStatementInFieldTemplate(Field), AttachedWdbm, MeasureDimensionsOf(FieldElements[0])));
+                        }
+
+                    }
+                }
+                
                 do {
          
                     // new search scroll&atom for scrolls in form template.
-                    for (String Field : DefaultFormFieldList) {
-                        String[] FieldElements = Field.split(SplittingColon);
-                        if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                            if (!Once) {
-                                Once = true;
-                                IndexScrolls.add(ThisScroll = new indexscroll(FieldElements[0] + Thread.currentThread().getId(),
-                                        ResolveSQLStatementInFieldTemplate(Field), AttachedWdbm, MeasureDimensionsOf(FieldElements[0])));
-                            } else {
-                                WithTheIndexScroll(FieldElements[0]).CurrentSearchAtom.Recycle(ResolveSQLStatementInFieldTemplate(Field));  //ConnectedForm = true;
-                            }
-                        }
-                    }
+                    if (ScrollPresent) WithTheIndexScroll(ScrollName).CurrentSearchAtom.Recycle(ResolveSQLStatementInFieldTemplate(ScrollField));  //ConnectedForm = true;
 
                     FormDisplay(LocalResult, AttachedWindow);
                     AttachedWindow.Refresh();
@@ -633,19 +641,28 @@ public class wdbm implements extools {
                         }
                     }
                 } while (ExitedWithKey.getKind() != Key.Kind.ReverseTab);
+            } catch (InterruptedException IEx) {
                 
             } catch (Exception ex) {
-                //  DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
+                try {
+                    ThisScroll.AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen",AttachedWindow);
+                } catch (SQLException ex1) {
+                    Logger.getLogger(wdbm.class.getName()).log(Level.SEVERE, null, ex1);
+                }
                 ex.printStackTrace();
             } finally {
               
                 AttachedWindow.screenHandle.stopScreen();
 
-                if (Once) {
+               // if (ScrollPresent) {
+
                     ThisScroll.SearchAtomStack.remove(ThisScroll.CurrentSearchAtom);
                     ThisScroll.AttachedWDBM.WindowStack.remove(AttachedWindow);
-                    ThisScroll.SQLQueryThread.interrupt();
-                }
+                    ThisScroll.AttachedWDBM.ActivatedFormStack.remove(this);
+                    ThisScroll.AttachedWDBM.ActivatedFormsThreadPool.remove(Thread.currentThread());
+                    if(ThisScroll.SQLQueryThread != null) ThisScroll.SQLQueryThread.interrupt();
+
+               // }
 
 
             }
@@ -676,17 +693,27 @@ public class wdbm implements extools {
                   //      return; //throw new SQLException("Exiting Exception ");
                   //  }
                 }
+                
+            } catch (InterruptedException IEx) {
+                close();
             } catch (Exception ex) {
                 System.err.println(ex.getClass().getName() + ": " + ex.getMessage());
                 ex.printStackTrace();
             } finally {
-                DefaultWindow.screenHandle.stopScreen();
-
-                for (indexscroll iter : IndexScrolls) {
-                    iter.SQLQueryThread.interrupt();
-                }
-
+                close();
             }
+        }
+       
+        public void close() {
+            Thread KillThread;
+            DefaultWindow.screenHandle.stopScreen();
+            while(!IndexScrolls.empty()){
+                KillThread = IndexScrolls.pop().SQLQueryThread;
+             if (KillThread!= null) KillThread.interrupt();
+            }
+
+            while (!ActivatedFormsThreadPool.empty()) ActivatedFormsThreadPool.pop().interrupt();
+            
         }
     }
    
@@ -738,12 +765,12 @@ public class wdbm implements extools {
             screenHandle.setCursorPosition(col, row);
         }
 
-public void Refresh () {
-  //  for (TerminalWindow iter : WindowStack) {
-                    screenHandle.refresh();
+        public void Refresh() {
+            //  for (TerminalWindow iter : WindowStack) {
+            screenHandle.refresh();
   //  }
-}
-        
+        }
+      
         public void Clear() {
             screenHandle.clear();
         }
