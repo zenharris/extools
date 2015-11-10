@@ -74,7 +74,7 @@ public class wdbm implements extools {
     public Connection SQLconnection;
     public ResultSet CurrentRecordResultSet;
 
-    public Stack<indexscroll> IndexScrolls = new Stack();
+    public Stack<indexscroll> ScrollStack = new Stack();
     public Stack<Thread> ActivatedFormsThreadPool = new Stack();
   
     public List<String> ErrorLog = new ArrayList();
@@ -106,54 +106,10 @@ public class wdbm implements extools {
         ReadDataDictionary(Paths.get(DataDictionaryFilename));
         OpenSQLfile();
         
-        // IndexScrolls.add(DefaultScroll = new indexscroll("default",ScrollingListDefaultSearchSQL,this,FormTemplate.size()));
         CreateDefaultScroll(DefaultFormTemplate.size());
         CreateAnyScrollsInDefaultForm();
        
     }
-    
- //   public TerminalWindow TopWindow() {
- //       return NamedWindow(Thread.currentThread().getId());
-       // return WindowStack.peek();
- //////   }
-    
-    /*
-   public TerminalWindow NamedWindow(long searchfor) {
-        for (TerminalWindow SearchPointer : WindowStack) {
-            if (SearchPointer.ThreadId == searchfor) return SearchPointer;
-        }
-        return null; // WindowStack.peek();
-    }
-   */
-         public TerminalWindow TopWindow() throws SQLException {
-             return ApropriateWindow();
-            // return NamedWindow(Thread.currentThread().getId());
-            // return WindowStack.peek();
-        }
-        
-        public TerminalWindow ApropriateWindow(long... OverrideThread) throws SQLException {
-            return DefaultWindow;
-            /*
-            long searcher;
-            if (OverrideThread.length > 0) searcher = OverrideThread[0];
-            else searcher = Thread.currentThread().getId();
-            for (TerminalWindow searchWindow : WindowStack ) {
-                for (long iter : searchWindow.ThreadPool) {
-                    if (iter == searcher) return searchWindow ;
-                }
-            }
-            throw new SQLException("Could Not find Apropriate window");
-            */
-        }
-        public TerminalWindow NamedWindow(long searchfor) throws SQLException {
-            for (TerminalWindow searchWindow : WindowStack) {
-                for (long iter : searchWindow.ThreadPool) {
-                    if (iter == searchfor) return searchWindow;
-                }
-                
-            } 
-            throw new SQLException("Could Not find Named window ->"+searchfor);
-        }
     
     
     
@@ -210,14 +166,14 @@ public class wdbm implements extools {
         for (String Field : DefaultFormFieldList) {
             String[] FieldElements = Field.split(SplittingColon);
             if (FieldElements[1].equals(IndexScrollFieldLabel)) {
-                IndexScrolls.push(new indexscroll(FieldElements[0], ResolveSQLStatementInFieldTemplate(Field), this, MeasureDimensionsOf(FieldElements[0])));
+                ScrollStack.push(new indexscroll(FieldElements[0], ResolveSQLStatementInFieldTemplate(Field), this, MeasureDimensionsOf(FieldElements[0])));
                 // IndexScroll(FieldElements[0]).ConnectedForm = false;
             }
         }
     }
     
     public void CreateDefaultScroll(int... Dimensions) throws SQLException {
-        IndexScrolls.push(DefaultScroll = new indexscroll("default", DefaultScrollSearchSQL, this, Dimensions));
+        ScrollStack.push(DefaultScroll = new indexscroll("default", DefaultScrollSearchSQL, this, Dimensions));
         DefaultScroll.ConnectedForm = true;
     }
 
@@ -275,7 +231,7 @@ public class wdbm implements extools {
     private String ResolveSQLStatementInFieldTemplate (String FormFieldDefinition) throws SQLException{
         String[] FieldElements = FormFieldDefinition.split(SplittingColon);
         String Replacement = DefaultScroll.CurrentSearchAtom.AtomicResultSet.getString(FieldElements[3]);
-        System.err.println(String.format(FieldElements[2],Replacement));
+       // System.err.println(String.format(FieldElements[2],Replacement));
         return String.format(FieldElements[2],Replacement);
     }
     
@@ -285,21 +241,23 @@ public class wdbm implements extools {
      * 
      * @param ScrollName    text name of scroll
      * @return
+     * @throws java.sql.SQLException
      */
+    @Override
     public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException{
-        for (indexscroll SearchCursor : IndexScrolls) {
+        for (indexscroll SearchCursor : ScrollStack) {
             if (SearchCursor.IndexScrollName.equals(ScrollName+Thread.currentThread().getId())){
-                System.err.println("Found Scroll "+ScrollName+" "+Thread.currentThread().getId());
+                // System.err.println("Found Scroll "+ScrollName+" "+Thread.currentThread().getId());
                 return SearchCursor;
             }
         }
-        for (indexscroll SearchCursor : IndexScrolls) {
+        for (indexscroll SearchCursor : ScrollStack) {
             if (SearchCursor.IndexScrollName.equals(ScrollName)){
-                System.err.println("Found Scroll "+ScrollName);
+               // System.err.println("Found Scroll "+ScrollName);
                 return SearchCursor;
             }
         }
-        throw new SQLException("Scroll Not Found in IndexScrolls "+ScrollName+" .zen");
+        throw new SQLException("Scroll Not Found in ScrollStack "+ScrollName+" .zen");
     }
 
 /**
@@ -484,7 +442,7 @@ public class wdbm implements extools {
 
         if (Prompt.length > 0) {
             DisplayPrompt(Prompt[0],Terminal);
-            TopWindow().Refresh();
+            Terminal.Refresh();
         }
         while ((KeyReceived = Terminal.GetKey()) == null) {
         //    try {
@@ -605,10 +563,9 @@ public class wdbm implements extools {
                             ScrollPresent = true;
                             ScrollName = FieldElements[0];
                             ScrollField = Field;
-                            IndexScrolls.push(ThisScroll = new indexscroll(ScrollName + Thread.currentThread().getId(),
+                            ScrollStack.push(ThisScroll = new indexscroll(ScrollName + Thread.currentThread().getId(),
                                     ResolveSQLStatementInFieldTemplate(Field), AttachedWdbm, MeasureDimensionsOf(FieldElements[0])));
                         }
-
                     }
                 }
                 
@@ -707,8 +664,8 @@ public class wdbm implements extools {
         public void close() {
             Thread KillThread;
             DefaultWindow.screenHandle.stopScreen();
-            while(!IndexScrolls.empty()){
-                KillThread = IndexScrolls.pop().SQLQueryThread;
+            while(!ScrollStack.empty()){
+                KillThread = ScrollStack.pop().SQLQueryThread;
              if (KillThread!= null) KillThread.interrupt();
             }
 
