@@ -26,25 +26,35 @@
 
 package org.househarris.extools;
 
-import com.googlecode.lanterna.input.Key;
-import com.googlecode.lanterna.terminal.Terminal;
-import com.googlecode.lanterna.terminal.TerminalSize;
+import com.googlecode.lanterna.SGR;
+import com.googlecode.lanterna.TerminalSize;
+import com.googlecode.lanterna.TextColor;
+// import com.googlecode.lanterna.input.Key;
+import com.googlecode.lanterna.input.KeyStroke;
+import com.googlecode.lanterna.input.KeyType;
+//import com.googlecode.lanterna.terminal.Terminal;
+// import com.googlecode.lanterna.terminal.TerminalSize;
+import java.io.IOException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.LinkedList;
+//import java.util.LinkedList;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.PriorityQueue;
-import java.util.Queue;
+//import java.util.PriorityQueue;
+//import java.util.Queue;
 import java.util.Stack;
-import java.util.concurrent.ArrayBlockingQueue;
+//import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+//import java.util.concurrent.Semaphore;
+//import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+/// import javax.swing.JFrame;
 import org.househarris.extools.wdbm.TerminalWindow;
 
 
@@ -69,18 +79,19 @@ public class indexscroll implements extools {
     public PreparedStatement CurrentCompiledSQLStatement;
     public List<String> SQLQueryHistory = new ArrayList();
 
-
-    public indexscroll(String ScrollName ,String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException {
+    
+    public searchAtom CurrentSearchAtom;
+    public Stack<searchAtom> SearchAtomStack = new Stack();
+    
+    public indexscroll(String ScrollName ,String SQLQuery,wdbm WDBMAttach,int... Dimensions) throws SQLException,IOException {
         System.err.println("Making New Index Scroll :" + ScrollName);
         if(Dimensions.length > 0){
             ListScreenTopLine = Dimensions[0];
-            ListScreenLength = WDBMAttach.TopWindow().rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
+            ListScreenLength = WDBMAttach.WindowStack.peek().rawTerminal.getTerminalSize().getRows()- ListScreenTopLine -3;
         }
-        
         if(Dimensions.length > 1) ListScreenLength = Dimensions[1];
-        
-        stmt = WDBMAttach.SQLconnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        Results = stmt.executeQuery(SQLQuery);
+        SearchAtomStack.push(CurrentSearchAtom = new searchAtom(SQLQuery, WDBMAttach));
+        Results = SearchAtomStack.peek().AtomicResultSet;
         if (!Results.first()) System.err.println("This returned nothing " + SQLQuery);     //      Empirical kudge ????
 
         ScreenCurrentRow = 0;
@@ -88,215 +99,324 @@ public class indexscroll implements extools {
         AttachedWDBM = WDBMAttach;
         CurrentSQLQuery = SQLQuery;
         IndexScrollName = ScrollName;
-        ListScrollsIndex = AttachedWDBM.IndexScrolls.size();
+        ListScrollsIndex = AttachedWDBM.ScrollStack.size();
         System.err.println(IndexScrollName + " " + ListScrollsIndex + " " +  CurrentSQLQuery );
     }
-    
-    public TerminalWindow TopWindow() {
-        return AttachedWDBM.WindowStack.peek();
-    }
- 
-    
     
     //private List<String> Substitute = new ArrayList();
     private List<String> FieldNames2ValuesSubstitute(List<String> FieldNameList,ResultSet LocalResult) throws SQLException {
         List<String> Substitute = new ArrayList();
-   //     int iter = 0;
    //     Substitute.clear();
         for (String FieldName : FieldNameList) {
             boolean add = Substitute.add(LocalResult.getString(FieldName));
-//            Substitute.add(Results.getString(FieldName));
         }
       //  String[] returnArray = Substitute.toArray();
         return Substitute;
     }
 
             
-    public void ReDrawScroll() throws SQLException,InterruptedException {
-        TerminalSize Tsize = TopWindow().TerminalSize();
-        int SaveResultRow = Results.getRow();
-        if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow);   /////Diagnostic
+    public void ReDrawScroll(searchAtom... AttachedSearchAtom) throws SQLException,InterruptedException,IOException {
+        TerminalWindow UseWindow;
+        if(AttachedSearchAtom.length>0) UseWindow = AttachedSearchAtom[0].AtomicOutTerminal;
+        else UseWindow = CurrentSearchAtom.AtomicOutTerminal;
+
+        TerminalSize Tsize = UseWindow.TerminalSize();
+        int SaveResultRow = CurrentSearchAtom.AtomicResultSet.getRow();
+        if (SaveResultRow < 1) AttachedWDBM.DisplayError("Something  Wrong  ReDrawScroll getRow" + SaveResultRow,UseWindow);   /////Diagnostic
         int startrow = SaveResultRow - ScreenCurrentRow;
         if (startrow < 1) {
             startrow = 1;
             ScreenCurrentRow = SaveResultRow -1;
         }
         int iter;
-        for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && Results.absolute(startrow + iter); iter++) {
-            TopWindow().DisplayString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
-                    FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()));
+        for (iter = 0; (ListScreenLength==0 || iter < ListScreenLength)  && ListScreenTopLine+iter + 4 <= Tsize.getRows() && 
+                CurrentSearchAtom.AtomicResultSet.absolute(startrow + iter); iter++) {
+            UseWindow.DisplayString(0, ListScreenTopLine+iter, String.format(AttachedWDBM.DefaultScrollFormat,
+                    FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,CurrentSearchAtom.AtomicResultSet).toArray()));
         }
         iter--;
-        while (iter++ < ListScreenLength-1) TopWindow().DisplayString(0, ListScreenTopLine+iter, BLANK);
-        // if (SaveResultRow < 1) SaveResultRow = 1;//    MYSTERY EMPIRICAL FIX
-        Results.absolute(SaveResultRow);
+        while (iter++ < ListScreenLength-1) UseWindow.DisplayString(0, ListScreenTopLine+iter, BLANK);
+        CurrentSearchAtom.AtomicResultSet.absolute(SaveResultRow);
     }
 
-    public void IlluminateCurrentRow() throws SQLException {
-        TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
-                String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
-                Terminal.Color.BLACK, Terminal.Color.WHITE);
-        TopWindow().Refresh();
+    public void IlluminateCurrentRow() throws SQLException,IOException {
+        
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setForegroundColor(TextColor.ANSI.BLACK);
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setBackgroundColor(TextColor.ANSI.WHITE);
+        
+        // CurrentSearchAtom.AtomicOutTerminal.screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
+        CurrentSearchAtom.AtomicOutTerminal.DisplayString(0, ListScreenTopLine + ScreenCurrentRow,
+                String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,CurrentSearchAtom.AtomicResultSet).toArray()),
+          //      TextColor.ANSI.BLACK, TextColor.ANSI.WHITE);
+                SGR.BOLD);
+        
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setForegroundColor(TextColor.ANSI.WHITE);
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setBackgroundColor(TextColor.ANSI.BLACK);
+        
+        CurrentSearchAtom.AtomicOutTerminal.Refresh();
     }
     
     /**
      *
      * @throws SQLException
      */
-    public void DeEmphasiseCurrentRow() throws SQLException {
-        TopWindow().screenHandle.putString(0, ListScreenTopLine + ScreenCurrentRow,
-                String.format(AttachedWDBM.DefaultScrollFormat, FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,Results).toArray()),
-                Terminal.Color.WHITE, Terminal.Color.BLACK);
-        TopWindow().Refresh();
+    public void DeEmphasiseCurrentRow() throws SQLException, IOException {
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setForegroundColor(TextColor.ANSI.WHITE);
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.setBackgroundColor(TextColor.ANSI.BLACK);
+        
+        CurrentSearchAtom.AtomicOutTerminal.screenWriter.putString(0, ListScreenTopLine + ScreenCurrentRow,
+                String.format(AttachedWDBM.DefaultScrollFormat,
+                        FieldNames2ValuesSubstitute(AttachedWDBM.DefaultScrollFields,CurrentSearchAtom.AtomicResultSet).toArray()));
+                     
+                // TextColor.ANSI.WHITE, TextColor.ANSI.BLACK);
+        CurrentSearchAtom.AtomicOutTerminal.Refresh();
     }
     
     public Thread SQLQueryThread;
-    //private Queue SQLQueryQueue = new LinkedList();
-    private final BlockingQueue<String> SQLQueryQueue = new LinkedBlockingQueue();
-//    private PriorityQueue SQLQueryPriorityQueue = new PriorityQueue();
-    private final Semaphore SQLQueryQueueLock = new Semaphore(1, true);
-
-    /**
-     *
-     * @param NewSQLQuery
-     * @throws SQLException
-     * @throws InterruptedException;
-     */
-    public void ReSearch(String NewSQLQuery) throws SQLException, InterruptedException {
-        if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
-            if (SQLQueryQueue.size() > 1) {
-            //    SQLQueryQueueLock.acquire();
-                SQLQueryThread.interrupt();
-            }
-//            SQLQueryThread.join();
-            SQLQueryQueue.clear();  //overrun mittigated
-            SQLQueryQueue.add(NewSQLQuery);
-            SQLQueryQueueLock.release();
-            return;
-        }
-        boolean add = SQLQueryQueue.add(NewSQLQuery);
-        SQLQueryQueueLock.release();
-        SQLQueryThread = new Thread(new QuantumForkReSearch());
-        SQLQueryThread.start();
+    private final BlockingQueue<searchAtom> SQLQueryQueue = new LinkedBlockingQueue();
+    
+    public searchAtom returnNewSearchAtom(String SQLStatement,wdbm Wdbm) throws SQLException {
+        return new searchAtom(SQLStatement, Wdbm);
+        
     }
 
-    public class QuantumForkReSearch implements Runnable {
+    @Override
+    public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+  
+    
+    public class searchAtom{
+        Connection AtomicSQLMainPipe;
+        String AtomicSQL;
+        TerminalWindow AtomicOutTerminal;
+        ResultSet AtomicResultSet;
+        Statement AtomicStatement;
+        PreparedStatement AtomicCompiledStatement;
+        
+        public searchAtom (String SQLStatement,wdbm Wdbm) throws SQLException {
+            AtomicSQLMainPipe = Wdbm.SQLconnection; //SQLMainPipe;
+            AtomicSQL = SQLStatement;
+            AtomicOutTerminal = Wdbm.WindowStack.peek(); //Terminal;
+            //  AtomicResultSet = Results;
+            AtomicCompiledStatement = AtomicSQLMainPipe.prepareStatement(SQLStatement, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            AtomicResultSet = AtomicCompiledStatement.executeQuery();
+            if (!AtomicResultSet.first()) {
+                throw new SQLException("searchAtom Error Condition -> no find first");
+            }
+        }
+
+        /**
+         * Recycles Current Search Atom giving it a new SQL query and optionally
+         * a new Terminal Window to send it's output.
+         *
+         * @param NewSQLQuery
+         * @param ToTerm Optional TerminalWindow to send all output
+         * @throws SQLException
+         * @throws InterruptedException;
+         * @return New SearchAtom if called with no currentSearchAtom.
+         */
+        public searchAtom Recycle(String NewSQLQuery, TerminalWindow... ToTerm) throws SQLException, InterruptedException {
+            TerminalWindow UseWindow;
+
+            if (ToTerm.length > 0)
+                UseWindow = ToTerm[0];
+            else UseWindow = AtomicOutTerminal;
+
+            if (NewSQLQuery.equals(AtomicSQL)) return this;
+          
+            if (SQLQueryThread != null && SQLQueryThread.isAlive()) {
+                
+                if (SQLQueryQueue.size() > 1) {
+                    SQLQueryThread.interrupt();
+                }
+                SQLQueryQueue.clear();  //overrun mittigated
+                
+                //      SQLQueryQueue.add(SearchAtom = new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+                AtomicSQL = NewSQLQuery;
+                if (ToTerm.length > 0) {
+                    AtomicOutTerminal = ToTerm[0];
+                }
+                SQLQueryQueue.add(this); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+                return this;
+            }
+            AtomicSQL = NewSQLQuery;
+            boolean add = SQLQueryQueue.add(this); // new searchAtom(NewSQLQuery,UseWindow,AttachedWDBM.SQLconnection));
+            SQLQueryThread = new Thread(new QuantumResearchDaemon());
+            
+            UseWindow.ThreadPool.add(SQLQueryThread.getId());
+
+            SQLQueryThread.start();
+            return this;
+        }
+
+        
+    }
+    
+    public class QuantumResearchDaemon implements Runnable {
         @Override
         public void run() {
-            ResultSet LocalResults;
+           // ResultSet LocalResults;
+            TerminalWindow Terminal = null;
             try {
-                while (true) {
-                        SQLQueryQueueLock.acquire();
-                        String NewSQLQuery = SQLQueryQueue.take();
-                        SQLQueryQueueLock.release();
-                        if (!NewSQLQuery.equals(CurrentSQLQuery)) {
+                do {
+                        searchAtom QueuedParameter = SQLQueryQueue.take();
+                        Terminal = QueuedParameter.AtomicOutTerminal;
+
+                       // if (!QueuedParameter.AtomicSQL.equals(CurrentSQLQuery)) {
                             AttachedWDBM.DisplayStatusLine("SQL Data Transfer Taking Place");
-                            TopWindow().Refresh();
-                            CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(NewSQLQuery, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                            LocalResults = CurrentCompiledSQLStatement.executeQuery();
-                            if (LocalResults.first()) {
-                                Results = LocalResults;
+                            Terminal.Refresh();
+                            
+                            CurrentCompiledSQLStatement = AttachedWDBM.SQLconnection.prepareStatement(QueuedParameter.AtomicSQL, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                            QueuedParameter.AtomicCompiledStatement = CurrentCompiledSQLStatement;
+                            QueuedParameter.AtomicResultSet = CurrentCompiledSQLStatement.executeQuery();
+                            
+                            if (QueuedParameter.AtomicResultSet.first()) {
+                            //    Results = QueuedParameter.AtomicResultSet;
                                 ScreenCurrentRow = 0;
-                                ResultsCurrentRow = Results.getRow();
+                                ResultsCurrentRow = QueuedParameter.AtomicResultSet.getRow();
                                 // AttachedWDBM.scrn.clear();
-                                ReDrawScroll();
+                                ReDrawScroll(QueuedParameter);
                                 SQLQueryHistory.add(CurrentSQLQuery);
-                                CurrentSQLQuery = NewSQLQuery;
+                                CurrentSQLQuery = QueuedParameter.AtomicSQL;
                             }
-                        }
+                       // }
                         AttachedWDBM.DisplayStatusLine("");
 //                    AttachedWDBM.screenHandle.refresh();
+                } while (true);
+            } catch (InterruptedException IEx) {
+                IEx.printStackTrace();
+            } catch (IOException IOx) {
+                IOx.printStackTrace();
+            } catch (NoSuchElementException | SQLException | NullPointerException ex) {
+                try {
+                    // SQLQueryQueue.clear();
+                    AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen",Terminal);
+                } catch (SQLException ex1) {
+                    Logger.getLogger(indexscroll.class.getName()).log(Level.SEVERE, null, ex1);
+                } catch (IOException Iox) {
+                    
                 }
-            } catch (InterruptedException | NoSuchElementException | SQLException | NullPointerException ex) {
-                // SQLQueryQueue.clear();
-                AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen");
-                ex.printStackTrace();
+                
             } catch (IllegalMonitorStateException ex) {
-               AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen"); 
+                ex.printStackTrace();
+          //     AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + "Zen"); 
             }finally {
-                SQLQueryQueueLock.release();
             }
         }
     }
  
+    
     /**
      *
      * @param SQLQuery
      * @throws SQLException
      */
-    public void ExecuteSQLQuery(String SQLQuery) throws SQLException,InterruptedException {
+    public void ExecuteSQLQuery(String SQLQuery,TerminalWindow... ToTerm) throws SQLException,InterruptedException,IOException {
         // ResultSet LocalResults;
+        TerminalWindow UseWindow;
+        
+        if (ToTerm.length>0) UseWindow = ToTerm[0];
+        else UseWindow = CurrentSearchAtom.AtomicOutTerminal;
+        
         try {
             AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
             AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
-            String LocalString = AttachedWDBM.PromptForString("->");
-            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
-                ReSearch(LocalString);
+            String LocalString = AttachedWDBM.PromptForString("->",UseWindow);
+            // if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKind() != Key.Kind.Escape) {
+            if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKeyType() != KeyType.Escape) {   
+                Results = CurrentSearchAtom.Recycle(LocalString).AtomicResultSet;
+                // Results = CurrentSearchAtom.AtomicResultSet;
             }
         } catch (SQLException ex) {
-            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLState " + ex.getSQLState());
+            AttachedWDBM.DisplayError(ex.getClass().getName() + ": " + ex.getMessage() + " SQLState " + ex.getSQLState(),UseWindow);
             ex.printStackTrace();
         } finally {
-            AttachedWDBM.DisplayError("");
+            AttachedWDBM.DisplayError("",UseWindow);
             AttachedWDBM.DisplayStatusLine("");
-            TopWindow().Refresh();
+            UseWindow.Refresh();
         }
     }
-  
- 
-    public Key ActivateScroll() throws SQLException,InterruptedException{
-        Key KeyReturn;
-        TerminalSize Tsize;
+  /*
+    public void ExecuteHTMLQuery (String HTMLQuery,TerminalWindow ToTerm) throws SQLException,InterruptedException,IOException {
+        // AttachedWDBM.TextEditor.LineEditorBuffer = CurrentSQLQuery;
+        // AttachedWDBM.TextEditor.LineEditorPosition = CurrentSQLQuery.length();
+        String LocalString = AttachedWDBM.PromptForString("->", ToTerm);
+        if (AttachedWDBM.TextEditor.LineEditorReturnKey.getKeyType() != KeyType.Escape) {
 
+            browser = new SwingBrowser();
+            JFrame main = browser.getMainWindow();
+            main.setSize(1100, 850);
+            main.setVisible(true);
+            browser.displayURL(LocalString);
+
+        }
+
+    }
+    */
+    // public Key ActivateScroll(TerminalWindow... AttachedWindow) throws SQLException,InterruptedException{
+    public KeyStroke ActivateScroll(TerminalWindow... AttachedWindow) throws SQLException,InterruptedException,IOException {
+        KeyStroke KeyReturn;
+        TerminalSize Tsize;
+        TerminalWindow UseWindow;
+
+        if (AttachedWindow.length>0) UseWindow = AttachedWindow[0];
+        else UseWindow = CurrentSearchAtom.AtomicOutTerminal;
+        
         ReDrawScroll();
-        TopWindow().Refresh();
+        
         while (true) {
-            Tsize = AttachedWDBM.TopWindow().TerminalSize();
-            ResultsCurrentRow = Results.getRow();
+            UseWindow.Refresh();
+            Tsize = UseWindow.TerminalSize();
+            ResultsCurrentRow = CurrentSearchAtom.AtomicResultSet.getRow();
             IlluminateCurrentRow();
-            if(ConnectedForm) AttachedWDBM.FormDisplay(Results);
-            TopWindow().Refresh();
-            if ((KeyReturn = AttachedWDBM.KeyInput(ScrollPrompt)).getKind() == Key.Kind.ReverseTab) {
+           
+            if(ConnectedForm) AttachedWDBM.FormDisplay(CurrentSearchAtom.AtomicResultSet,CurrentSearchAtom.AtomicOutTerminal);
+            UseWindow.Refresh();
+            // if ((KeyReturn = AttachedWDBM.KeyInput(UseWindow,ScrollPrompt)).getKeyType() == KeyType.ReverseTab) {
+            if ((KeyReturn = AttachedWDBM.KeyInput(UseWindow,ScrollPrompt)).getKeyType() == KeyType.ReverseTab) {
                 DeEmphasiseCurrentRow();
                 return KeyReturn;
-            } else if (KeyReturn.getKind() == Key.Kind.ArrowDown && !Results.isLast()) {
+            } else if (KeyReturn.getKeyType() == KeyType.ArrowDown && !CurrentSearchAtom.AtomicResultSet.isLast()) {
                 if ((ListScreenLength == 0 || ScreenCurrentRow + 1 < ListScreenLength) && ListScreenTopLine + ScreenCurrentRow + 4 < Tsize.getRows()) {
                     DeEmphasiseCurrentRow();
                     ScreenCurrentRow++;
-                    Results.next();
+                    CurrentSearchAtom.AtomicResultSet.next();
                 } else {
-                    Results.next();
+                    CurrentSearchAtom.AtomicResultSet.next();
                     ReDrawScroll();
                 }
-            } else if (KeyReturn.getKind() == Key.Kind.ArrowUp && !Results.isFirst()) {
+            } else if (KeyReturn.getKeyType() == KeyType.ArrowUp && !CurrentSearchAtom.AtomicResultSet.isFirst()) {
                 if (ScreenCurrentRow > 0) {
                     DeEmphasiseCurrentRow();
                     ScreenCurrentRow--;
-                    Results.previous();
+                    CurrentSearchAtom.AtomicResultSet.previous();
                 } else {
-                    Results.previous();
+                    CurrentSearchAtom.AtomicResultSet.previous();
                     ReDrawScroll();
                 }
-            } else if (KeyReturn.getKind() == Key.Kind.PageDown && !Results.isLast()) {
-                Results.relative(ListScreenLength-1);
-                if(Results.isAfterLast()) Results.last();
+            } else if (KeyReturn.getKeyType() == KeyType.PageDown && !CurrentSearchAtom.AtomicResultSet.isLast()) {
+                CurrentSearchAtom.AtomicResultSet.relative(ListScreenLength-1);
+                if(CurrentSearchAtom.AtomicResultSet.isAfterLast()) CurrentSearchAtom.AtomicResultSet.last();
                 ReDrawScroll();
-            } else if (KeyReturn.getKind() == Key.Kind.PageUp) {
-                if(Results.getRow()-(ListScreenLength) > ListScreenLength) Results.relative(1-ListScreenLength);
-                else Results.absolute(ScreenCurrentRow+1);
+            } else if (KeyReturn.getKeyType() == KeyType.PageUp) {
+                if(CurrentSearchAtom.AtomicResultSet.getRow()-(ListScreenLength) > ListScreenLength) CurrentSearchAtom.AtomicResultSet.relative(1-ListScreenLength);
+                else CurrentSearchAtom.AtomicResultSet.absolute(ScreenCurrentRow+1);
                 // else Results.first();
                 ReDrawScroll();
-            } else if (KeyReturn.getKind() == Key.Kind.End) {
-                Results.last();
+            } else if (KeyReturn.getKeyType() == KeyType.End) {
+                CurrentSearchAtom.AtomicResultSet.last();
                 ReDrawScroll();
-            } else if (KeyReturn.getKind() == Key.Kind.Home) {
-                Results.first();
+            } else if (KeyReturn.getKeyType() == KeyType.Home) {
+                CurrentSearchAtom.AtomicResultSet.first();
                 ReDrawScroll();
-            } else if (KeyReturn.getKind() == Key.Kind.NormalKey) {
+            } else if (KeyReturn.getKeyType() == KeyType.Character) {
                 if (KeyReturn.getCharacter() == 's') {
                     ExecuteSQLQuery(CurrentSQLQuery);
+                } else if (KeyReturn.getCharacter() == 'h') {
+                  //  ExecuteHTMLQuery("", UseWindow);
                 } else return KeyReturn;
-            } else if (KeyReturn.getKind() == Key.Kind.Enter || KeyReturn.getKind() == Key.Kind.Escape) {
+            } else if (KeyReturn.getKeyType() == KeyType.Enter || KeyReturn.getKeyType() == KeyType.Escape) {
                 DeEmphasiseCurrentRow();
                 return KeyReturn;
             }

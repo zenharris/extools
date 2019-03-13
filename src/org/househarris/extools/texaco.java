@@ -24,9 +24,13 @@
 
 package org.househarris.extools;
 
-import com.googlecode.lanterna.input.Key;
+// import com.googlecode.lanterna.input.Key;
+import com.googlecode.lanterna.input.KeyStroke;
+import com.googlecode.lanterna.input.KeyType;
+// import com.googlecode.lanterna.terminal.TerminalSize;
 import java.io.IOException;
 import java.sql.SQLException;
+import static org.househarris.extools.extools.BLANK;
 
 /**
  *
@@ -35,7 +39,7 @@ import java.sql.SQLException;
 public class texaco implements extools {
     public String LineEditorBuffer = "";
     public int LineEditorPosition = 0;
-    public Key LineEditorReturnKey;
+    public KeyStroke LineEditorReturnKey;
     public wdbm AttachedWDBM;
     
    public texaco(wdbm Attach) throws IOException,ClassNotFoundException,SQLException {
@@ -53,8 +57,8 @@ public class texaco implements extools {
         LineEditorBuffer = LineEditorBuffer.substring(0, LineEditorPosition) + LineEditorBuffer.substring(LineEditorPosition + 1);
     }
     
-    private void BlankLastCharacterOfFieldBeingEdited(int x,int y) {
-        AttachedWDBM.TopWindow().DisplayString(x + LineEditorBuffer.length(), y, " ");
+    private void BlankLastCharacterOfFieldBeingEdited(wdbm.TerminalWindow Terminal,int x,int y) throws SQLException,IOException {
+        Terminal.DisplayString(x + LineEditorBuffer.length(), y, " ");
     }
     
     /**
@@ -68,36 +72,81 @@ public class texaco implements extools {
      * @return
      * @throws SQLException
      */
-    public String LineEditor(int x, int y, int LengthLimit, String... InitialValue) throws SQLException,InterruptedException {
-        Key KeyReceived;
+    public String LineEditor(wdbm.TerminalWindow Terminal,int x, int y, int LengthLimit, String... InitialValue) 
+            throws SQLException,InterruptedException,IOException {
+        KeyStroke KeyReceived;
         if (InitialValue.length > 0) LineEditorBuffer = InitialValue[0];
 //        else LineEditorBuffer = "";
         if (LineEditorPosition > LineEditorBuffer.length()) LineEditorPosition = LineEditorBuffer.length();
         while (true) {
-            AttachedWDBM.TopWindow().DisplayString(x, y, LineEditorBuffer);
-            AttachedWDBM.TopWindow().screenHandle.setCursorPosition(x + LineEditorPosition, y);
-            AttachedWDBM.TopWindow().screenHandle.refresh();
-            LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput();
-            if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
+            Terminal.DisplayString(x, y, LineEditorBuffer);
+        ///    Terminal.screenHandle.setCursorPosition(x + LineEditorPosition, y);
+            Terminal.rawTerminal .setCursorPosition(x + LineEditorPosition, y);
+            Terminal.screenHandle.refresh();
+           LineEditorReturnKey = KeyReceived = AttachedWDBM.KeyInput(Terminal);
+        ///    if (KeyReceived.getKind() == Key.Kind.NormalKey && LineEditorBuffer.length() < LengthLimit) {
+            if (KeyReceived.getKeyType() == KeyType.Character && LineEditorBuffer.length() < LengthLimit) {
                 InsertCharacterIntoLineEditorBuffer(KeyReceived.getCharacter());
                 LineEditorPosition++;
-            } else if (KeyReceived.getKind() == Key.Kind.Backspace && LineEditorPosition > 0) {
+            } else if (KeyReceived.getKeyType() == KeyType.Backspace && LineEditorPosition > 0) {
                 LineEditorPosition--;
                 DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowDown && LineEditorPosition < LineEditorBuffer.length()) {   // using down arrow for delete key
+                BlankLastCharacterOfFieldBeingEdited(Terminal,x, y);
+            } else if (KeyReceived.getKeyType() == KeyType.ArrowDown && LineEditorPosition < LineEditorBuffer.length()) {   // using down arrow for delete key
                 DeleteCharacterFromLineEditorBuffer();
-                BlankLastCharacterOfFieldBeingEdited(x, y);
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowLeft && LineEditorPosition > 0) {
+                BlankLastCharacterOfFieldBeingEdited(Terminal,x, y);
+            } else if (KeyReceived.getKeyType() == KeyType.ArrowLeft && LineEditorPosition > 0) {
                 LineEditorPosition--;
-            } else if (KeyReceived.getKind() == Key.Kind.ArrowRight && LineEditorPosition < LineEditorBuffer.length()) {
+            } else if (KeyReceived.getKeyType() == KeyType.ArrowRight && LineEditorPosition < LineEditorBuffer.length()) {
                 LineEditorPosition++;
-            } else if (KeyReceived.getKind() == Key.Kind.Enter || KeyReceived.getKind() == Key.Kind.Escape) {
+            } else if (KeyReceived.getKeyType() == KeyType.Enter || KeyReceived.getKeyType() == KeyType.Escape) {
                 return LineEditorBuffer;
             }
         }
     }
 
- 
+    
+    @Override
+    public indexscroll WithTheIndexScroll(String ScrollName) throws SQLException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+/**
+    public void ReDrawTextWindow(wdbm.TerminalWindow Terminal,int x, int y, int LengthLimit, String... InitialValue) throws SQLException, InterruptedException {
+        wdbm.TerminalWindow UseWindow = Terminal;
+;        int TextScreenTopLine = 0;
+        int TextScreenLength = 0;
+        int ScreenCurrentRow = 0;
+
+        TerminalSize Tsize = UseWindow.TerminalSize();
+       
+        
+        
+        
+        int startrow = SaveResultRow - ScreenCurrentRow;
+        if (startrow < 1) {
+            startrow = 1;
+            ScreenCurrentRow = SaveResultRow - 1;
+        }
+        
+        
+        int iter;
+        for (iter = 0; (TextScreenLength == 0 || iter < TextScreenLength) && TextScreenTopLine + iter + 4 <= Tsize.getRows()
+                && CurrentSearchAtom.AtomicResultSet.absolute(startrow + iter); iter++) {
+            
+            // display current line of text
+            
+            UseWindow.DisplayString(0, TextScreenTopLine + iter, TextString);
+
+        }
+        iter--;
+        while (iter++ < TextScreenLength - 1) {
+            UseWindow.DisplayString(0, TextScreenTopLine + iter, BLANK);
+        }
+        
+    }
+
+*/
+    
+    
 }
     
