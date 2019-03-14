@@ -19,9 +19,9 @@ public class ExampleMain {
         
         try {
             wdbm primaryFile = new wdbm("prim.dict");
-            ///wdbm resieFile = new wdbm("resie.dict");
+            wdbm resieFile = new wdbm("resie.dict");
             primaryFile.ActivateWDBM();
-            ///resieFile.ActivateWDBM();
+            resieFile.ActivateWDBM();
         } catch (Exception e) {
             e.printStackTrace();
             System.err.println(e.getClass().getName() + ": " + e.getMessage());
